@@ -12,6 +12,9 @@ dependencies = [
     "pyarrow>=17",
 ]
 
+[project.scripts]
+polaritics = "polaritics.cli:main"
+
 [project.optional-dependencies]
 modelo = [
     "jax>=0.4.30",
