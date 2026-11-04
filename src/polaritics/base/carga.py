@@ -6,6 +6,7 @@ from pathlib import Path
 import duckdb
 
 from polaritics.base import partidos, votacoes
+from polaritics.coleta import especialistas
 from polaritics.config import DIR_BRUTOS, DIR_PROCESSADOS, GOVERNOS, LEGISLATURAS
 
 log = logging.getLogger(__name__)
@@ -43,8 +44,8 @@ def _carregar_referencias(con: duckdb.DuckDBPyConnection) -> None:
         ],
     )
     con.executemany(
-        "insert into partido_sucessao values (?, ?, ?)",
-        [(sigla, suc, dia) for sigla, (suc, dia) in partidos.SUCESSORES.items()],
+        "insert into partido_sucessao values (?, ?, ?, ?)",
+        [(sigla, *sucessao) for sigla, sucessao in partidos.SUCESSORES.items()],
     )
 
 
@@ -113,7 +114,24 @@ def _derivar_filiacao(con: duckdb.DuckDBPyConnection) -> None:
     """)
 
 
-def construir_base(brutos: Path = DIR_BRUTOS / "camara", destino: Path = CAMINHO_BASE) -> Path:
+def _carregar_especialistas(con: duckdb.DuckDBPyConnection, arquivo: Path) -> None:
+    if not arquivo.exists():
+        log.warning("notas dos especialistas ausentes (%s); rode `polaritics coletar`", arquivo)
+        return
+    con.executemany(
+        "insert into nota_especialistas values (?, ?, ?, ?, 2022, ?)",
+        [
+            (n.partido, n.nota, n.n_respostas, n.desvio_padrao, n.origem)
+            for n in especialistas.notas_2022(arquivo)
+        ],
+    )
+
+
+def construir_base(
+    brutos: Path = DIR_BRUTOS / "camara",
+    destino: Path = CAMINHO_BASE,
+    arquivo_especialistas: Path = especialistas.ARQUIVO,
+) -> Path:
     destino.parent.mkdir(parents=True, exist_ok=True)
     temporario = destino.with_suffix(".duckdb.construindo")
     temporario.unlink(missing_ok=True)
@@ -123,6 +141,7 @@ def construir_base(brutos: Path = DIR_BRUTOS / "camara", destino: Path = CAMINHO
         _carregar_referencias(con)
         _carregar_camara(con, brutos)
         _derivar_filiacao(con)
+        _carregar_especialistas(con, arquivo_especialistas)
     temporario.replace(destino)
     log.info("base construída em %s", destino)
     return destino

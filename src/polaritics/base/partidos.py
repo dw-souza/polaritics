@@ -1,15 +1,25 @@
 """Siglas partidárias: harmonização e sucessões (fusões e incorporações)."""
 
 from datetime import date
+from typing import Literal, NamedTuple
 
 SEM_PARTIDO = "S.PART."
 
-# Partido extinto → (sucessor, data da decisão do TSE que aprovou a fusão/incorporação).
+
+class Sucessao(NamedTuple):
+    sucessor: str
+    data_decisao: date  # decisão do TSE que aprovou a fusão/incorporação
+    # incorporação: o sucessor já existia e mantém a identidade;
+    # fusão: o sucessor é um partido novo.
+    tipo: Literal["incorporacao", "fusao"]
+
+
+# Partido extinto → sucessão.
 SUCESSORES = {
-    "PROS": ("SOLIDARIEDADE", date(2023, 2, 14)),
-    "PSC": ("PODE", date(2023, 6, 15)),
-    "PATRIOTA": ("PRD", date(2023, 11, 9)),
-    "PTB": ("PRD", date(2023, 11, 9)),
+    "PROS": Sucessao("SOLIDARIEDADE", date(2023, 2, 14), "incorporacao"),
+    "PSC": Sucessao("PODE", date(2023, 6, 15), "incorporacao"),
+    "PATRIOTA": Sucessao("PRD", date(2023, 11, 9), "fusao"),
+    "PTB": Sucessao("PRD", date(2023, 11, 9), "fusao"),
 }
 
 # Grafias usadas por outras fontes → sigla da Câmara.
@@ -36,5 +46,5 @@ def harmonizar(sigla: str | None) -> str | None:
 def sucessor_atual(sigla: str) -> str:
     """Segue a cadeia de sucessões até o partido existente hoje."""
     while sigla in SUCESSORES:
-        sigla = SUCESSORES[sigla][0]
+        sigla = SUCESSORES[sigla].sucessor
     return sigla

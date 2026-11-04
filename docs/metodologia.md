@@ -24,7 +24,7 @@ Permitir que o eleitor compare **o que o parlamentar diz ser** (o partido e o es
 | Votações nominais, votos individuais, orientações de bancada e do governo | API Dados Abertos da Câmara (`dadosabertos.camara.leg.br/api/v2`) + arquivos anuais em lote | Fonte principal do MVP |
 | Idem, Senado | Dados Abertos do Senado (`legis.senado.leg.br/dadosabertos`) | Fase 2. **A verificar:** disponibilidade da orientação do governo por votação |
 | Identidade, partido, candidaturas | TSE Dados Abertos | Chave de identidade entre mandatos e casas |
-| Classificação ideológica dos partidos | Bolognesi, Ribeiro & Codato (2023, *Dados*) e atualização Bolognesi, Ribeiro, Codato & Silva (*Opinião Pública*), escala 0–10 por especialistas | Âncora externa da escala |
+| Classificação ideológica dos partidos | Bolognesi, Ribeiro, Codato & Silva, *Database on the ideological classification of all Brazilian political parties (2018-2022)*, Harvard Dataverse, doi:10.7910/DVN/MFIXKW, licença CC0. Respostas individuais de especialistas, escala 0–10, onda de 2022 | Âncora externa da escala. Média calculada pelo projeto a partir das respostas; arquivo com hash fixado |
 | Validação | Pesquisa Legislativa Brasileira (Power & Zucco, Harvard Dataverse), GPS Partidário 2026 (Folha), Radar do Congresso (Congresso em Foco) | Apenas para comparar resultados, nunca como insumo |
 
 Dados brutos são baixados, versionados por data de coleta e mantidos congelados para cada publicação.
@@ -65,12 +65,48 @@ Codificação dos votos:
 ### 4.1 Modelo
 - **IRT bayesiano unidimensional** (modelo de ponto ideal; padrão acadêmico, equivalente ao usado no Voteview e no GPS Partidário).
 - Estimação por MCMC, ≥ 2 cadeias, com diagnóstico de convergência (R-hat < 1,01; ESS mínimo). Se não convergir, a publicação é bloqueada.
-- **Identificação de sinal:** deputado-âncora de partido classificado como esquerda pelos especialistas recebe sinal negativo; âncora de partido de direita, positivo. A escolha é programática (maior participação), não manual.
+- **Identificação:** a escala é fixada padronizando as posições em cada amostra (média 0, desvio 1). O sinal é fixado em cada cadeia: deputados de partidos que os especialistas classificam abaixo de 4,5 ficam, em média, à esquerda dos classificados acima de 5,5. As cadeias partem do primeiro componente da decomposição em valores singulares (SVD) da matriz de votos, o que evita o modo espelhado. Nenhum deputado é escolhido à mão.
+- **Prioris:** posição ~ N(0, 1); dificuldade da votação ~ N(0, 5); discriminação ~ N(0, 2,5).
 
-### 4.2 Tradução para a escala 0–10
-1. Calcula-se a mediana do ponto ideal dos deputados de cada partido.
-2. Ajusta-se uma transformação monotônica (linear no v0.1) entre essas medianas e as notas 0–10 dos especialistas, **usando só partidos com nota disponível e ≥ 3 deputados**.
-3. A mesma transformação é aplicada a cada deputado (com a distribuição posterior inteira, preservando a incerteza).
+### 4.2 Tradução para a escala 0–10: duas visões
+
+As duas visões saem das **mesmas amostras do modelo**. Só muda a régua aplicada no fim, e cada uma responde a uma pergunta diferente.
+
+**Visão principal — "Comportamento de voto"** *(decisão D4)*
+- Pergunta: *pelo jeito que vota, onde este parlamentar está? Isso bate com o que o partido diz ser?*
+- Régua linear fixada por **dois partidos de referência**: o maior partido com nota dos especialistas abaixo de 4,5 e o maior acima de 5,5. Na 57ª legislatura, são **PT** (2,68) e **PL** (8,80). Esses dois recebem a nota dos especialistas; todos os outros partidos e deputados se posicionam **só pelos votos**.
+- É a régua que define a **faixa** exibida e permite comparar "partido classificado como X × vota como Y".
+- Por que não ajustar a régua a todos os partidos: no teste, a regressão isotônica reproduziu quase exatamente a nota de cada partido (PODE 7,44 × 7,44; PP 8,15 × 8,15), o que anula a comparação. A reta ajustada a todos os partidos comprimia a esquerda (o PT caía em centro-esquerda) e punha 61 deputados no teto 10. Com os dois polos, são 14.
+
+**Visão secundária — "Dentro do campo do partido"**
+- Pergunta: *comparado ao próprio partido, este parlamentar é mais moderado ou mais radical?*
+- Régua monotônica por partes (regressão isotônica ponderada pelo tamanho das bancadas): cada partido fica perto da própria nota de especialistas, e o deputado aparece à esquerda ou à direita dele.
+- Exibida como **comparação com o partido** (ex.: "mais à direita que o próprio partido"), **não** como uma segunda faixa. Assim cada pessoa tem uma faixa só.
+
+Em ambas, só entram como referência partidos com nota dos especialistas e ≥ 3 deputados. A posição de cada partido é a mediana dos seus deputados, em cada amostra.
+
+### 4.2.1 Visões selecionáveis *(decisão D6)*
+
+O leitor pode trocar a visão, mas sempre parte de uma **visão padrão fixa**. São duas escolhas independentes:
+
+| Escolha | Opções | Pergunta |
+|---|---|---|
+| Régua | **Comportamento de voto** (padrão) · Dentro do campo do partido | Onde está pelos votos × comparado ao próprio partido |
+| Votações | **Todas** (padrão) · Só mérito | Com ou sem as votações de andamento da pauta |
+
+Regras:
+- **A visão padrão não muda conforme o resultado.** Ela só muda numa nova versão da metodologia, com justificativa escrita. Nunca muda de forma automática, nem porque um indicador entrou ou saiu de uma meta.
+- **A visão em uso aparece sempre junto do resultado**, inclusive em links e imagens compartilhadas. Um link compartilhado abre na visão padrão, salvo se a pessoa escolher outra de propósito. Isso evita que se divulgue só a visão mais conveniente.
+- Cada opção tem uma explicação curta na própria tela (rascunho na seção 4.2).
+- Quando a faixa do parlamentar muda entre as visões, a página avisa ("a faixa depende da visão escolhida").
+- A reta ajustada a todos os partidos não é oferecida: não responde a uma pergunta diferente e confundiria o leitor.
+
+**Texto didático para a tela (rascunho):**
+> *Posição pelos votos:* calculada só com as votações nominais do plenário. A régua é calibrada por dois partidos de referência (PT e PL), e todos os demais aparecem onde os votos os colocam. Um partido classificado como direita por especialistas pode aparecer mais ao centro se vota frequentemente com partidos de centro.
+>
+> *Comparado ao próprio partido:* mostra se o parlamentar vota de forma mais moderada ou mais radical que os colegas de partido.
+>
+> *Governismo:* não é ideologia. Mostra o quanto ele acompanha o governo do momento nas votações em que governo e oposição discordaram.
 
 ### 4.3 Faixas (cortes fixos, herdados do instrumento dos especialistas)
 
@@ -166,13 +202,19 @@ Para cada parlamentar:
 
 | Teste | Critério de aceitação (v0.1) |
 |---|---|
-| Correlação das medianas partidárias com os especialistas | ≥ 0,85 (GPS Partidário obteve 0,92) |
-| Correlação com a Pesquisa Legislativa Brasileira | ≥ 0,80 |
+| Ordem das medianas partidárias × especialistas (Spearman) | ≥ 0,80 *(decisão D7)* |
+| Ordem das medianas partidárias × Pesquisa Legislativa Brasileira (Spearman) | ≥ 0,75 |
 | Ordem dos partidos comparada ao GPS Partidário 2026 (votações) | Sem inversões entre famílias esquerda/centro/direita sem explicação documentada |
 | Governismo médio da Câmara comparado ao Radar do Congresso | Diferença ≤ 3 p.p. ou explicada pela regra de codificação |
 | Sensibilidade: todas as votações × só mérito | Correlação das posições individuais ≥ 0,90; parlamentares que mudam de faixa são listados e sinalizados |
 | Estabilidade (bootstrap por votação) | ≥ 90% dos deputados mantêm a faixa em ≥ 80% das reamostragens |
 | Convergência MCMC | R-hat < 1,01 em todos os parâmetros de deputados |
+
+**Indicador acompanhado, sem efeito sobre a publicação:** a correlação de Pearson entre as medianas partidárias pelos votos e as notas dos especialistas. Ela mede o quanto as *distâncias* do comportamento de voto se parecem com a classificação dos especialistas, e é publicada a cada atualização. Na 57ª legislatura (até out/2026), o valor é 0,81. Uma subida ou queda é um **achado** (ex.: o centrão votando mais como a oposição), não um motivo para mudar o método.
+
+Por que a ordem barra a publicação e a distância não *(D7)*: esperamos que a ordem dos partidos pelos votos seja coerente com a dos especialistas. As distâncias, não; a diferença entre "diz ser" e "vota como" é justamente o que o projeto quer mostrar. Exigir Pearson ≥ 0,85 (critério da v0.1 original) puniria o próprio achado.
+
+Transparência: o critério D7 foi definido **depois** da primeira rodada completa do modelo (Spearman 0,89 com todas as votações e 0,91 só com mérito; Pearson 0,81 e 0,83). A partir desta versão, ele fica fixo, e qualquer mudança exige nova versão da metodologia.
 
 ## 9. Decisões
 
@@ -183,12 +225,16 @@ Para cada parlamentar:
 | D1 | Obstrução = "Não" em todas as medidas (seção 3) | v0.1 |
 | D2 | Votações de procedimento entram, com variante de sensibilidade só com mérito (seções 3 e 8) | v0.1 |
 | D3 | Faixas das pontas: "mais à esquerda" e "mais à direita" (seção 4.3) | v0.1 |
+| D4 | Duas visões sobre as mesmas amostras: régua por dois partidos-polo (principal, define a faixa) e régua isotônica (comparação com o próprio partido) (seção 4.2) | v0.1 |
+| D6 | Visões selecionáveis (régua × votações) com visão padrão fixa: comportamento de voto + todas as votações (seção 4.2.1) | v0.1 |
+| D7 | Critério de publicação pela ordem dos partidos (Spearman); Pearson vira indicador acompanhado (seção 8) | v0.1 |
+| D5 | Âncora: base original de Bolognesi et al. (onda 2022, Harvard Dataverse, CC0), com hash fixado. Incorporação mantém a nota do partido incorporador; fusão recebe a média dos partidos de origem (PRD = média de PTB e Patriota) | v0.1 |
 
 ### Em aberto
 
-1. **Transformação** para 0–10: linear ou monotônica não linear (ex.: isotônica)? **O teste exploratório (anexo A) mostrou que a linear não serve:** ela comprime a esquerda (PSOL cai em centro-esquerda) e satura a direita (PL e NOVO batem em 10). A tendência é adotar uma transformação monotônica por partes, ancorada nas medianas partidárias.
-2. **Âncora:** levantamento de especialistas de 2022 ou 10ª onda da Pesquisa Legislativa Brasileira (2025), se os dados forem publicados?
-3. **Senado:** escala separada ou ponte com a Câmara via notas dos partidos?
+1. **Atualização da âncora:** adotar a 10ª onda da Pesquisa Legislativa Brasileira (2025) quando os dados forem publicados?
+2. **Senado:** escala separada ou ponte com a Câmara via notas dos partidos?
+3. **Partidos sem nota** (ex.: MISSÃO, criado em 2025): ficam posicionados pelos votos, sem comparação com especialistas, até a próxima onda.
 
 ## 10. Limitações declaradas
 

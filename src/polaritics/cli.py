@@ -7,10 +7,12 @@ from datetime import date
 import duckdb
 
 from polaritics.base.carga import CAMINHO_BASE, construir_base
+from polaritics.coleta import especialistas
 from polaritics.coleta.camara import ColetorCamara, checar_sanidade
 from polaritics.config import LEGISLATURAS
 from polaritics.medidas.fidelidade import calcular_fidelidade
 from polaritics.medidas.governismo import calcular_governismo
+from polaritics.medidas.ideologia.calculo import VARIANTES, calcular_ideologia
 
 
 def coletar(args: argparse.Namespace) -> None:
@@ -20,6 +22,7 @@ def coletar(args: argparse.Namespace) -> None:
     contagem = checar_sanidade(coletor.destino, args.legislatura, hoje)
     for ano, n in contagem.items():
         print(f"{ano}: {n} votações nominais de plenário")
+    especialistas.baixar()
 
 
 def base(_args: argparse.Namespace) -> None:
@@ -57,6 +60,20 @@ def medidas(args: argparse.Namespace) -> None:
         con.sql(RESUMO_PARTIDOS, params=[args.legislatura]).show(max_rows=40)
 
 
+def ideologia(args: argparse.Namespace) -> None:
+    with duckdb.connect(str(CAMINHO_BASE)) as con:
+        for variante in args.variante:
+            convergiu = calcular_ideologia(
+                con,
+                args.legislatura,
+                variante,
+                aquecimento=args.aquecimento,
+                amostras=args.amostras,
+                cadeias=args.cadeias,
+            )
+            print(f"{variante}: {'convergiu' if convergiu else 'NÃO convergiu (não publicar)'}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="polaritics")
     sub = parser.add_subparsers(required=True)
@@ -69,6 +86,14 @@ def main() -> None:
     p = sub.add_parser("medidas", help="calcula governismo e fidelidade partidária")
     p.add_argument("--legislatura", type=int, choices=sorted(LEGISLATURAS), default=57)
     p.set_defaults(func=medidas)
+
+    p = sub.add_parser("ideologia", help="estima a posição ideológica (IRT, MCMC)")
+    p.add_argument("--legislatura", type=int, choices=sorted(LEGISLATURAS), default=57)
+    p.add_argument("--variante", nargs="+", choices=sorted(VARIANTES), default=["todas", "merito"])
+    p.add_argument("--aquecimento", type=int, default=1000)
+    p.add_argument("--amostras", type=int, default=1000)
+    p.add_argument("--cadeias", type=int, default=2)
+    p.set_defaults(func=ideologia)
 
     p = sub.add_parser("base", help="constrói a base DuckDB a partir dos dados brutos")
     p.set_defaults(func=base)

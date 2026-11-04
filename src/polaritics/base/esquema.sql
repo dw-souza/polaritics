@@ -18,7 +18,8 @@ create table governo (
 create table partido_sucessao (
     sigla           varchar primary key,
     sucessor        varchar not null,
-    data_decisao    date not null
+    data_decisao    date not null,
+    tipo            varchar not null             -- incorporacao | fusao
 );
 
 create table deputado (
@@ -75,4 +76,14 @@ create table filiacao (
     partido     varchar,
     inicio      date not null,
     fim         date not null
+);
+
+-- Âncora da escala 0–10: notas de especialistas por partido (coleta/especialistas.py).
+create table nota_especialistas (
+    partido         varchar primary key,
+    nota            double not null,
+    n_respostas     integer,
+    desvio_padrao   double,
+    onda            integer not null,
+    origem          varchar not null             -- direta | fusão de X + Y
 );
