@@ -11,7 +11,7 @@
 | Modelo IRT | NumPyro (NUTS, MCMC) | Rápido em CPU para cerca de 600 deputados × 1.000 votações |
 | Qualidade | `ruff`, `pytest`, checagens de sanidade dos dados | A publicação é bloqueada se algo falhar |
 | Automação | GitHub Actions (cron semanal) | Gratuito; atualiza os dados e gera o relatório de validação |
-| Saída | JSON/Parquet estáticos, consumidos depois por um site estático | Sem backend no MVP |
+| Publicação | Postgres no Neon (plano gratuito), lido pelo site na Vercel | Recebe só os resultados publicados, que ocupam dezenas de MB. Os dados brutos e o processamento ficam no DuckDB, porque só os brutos de uma legislatura já passam de 300 MB e o plano gratuito tem 1 GB por projeto. O DuckDB grava direto no Postgres pela extensão `postgres` |
 
 ## 2. Estrutura do repositório
 
@@ -71,11 +71,12 @@ Pensado para receber o Senado, novas legislaturas e, no futuro, as câmaras muni
 | M3 | Medidas simples | Governismo (total e disputado) e fidelidade | Média da Câmara a ≤ 3 p.p. do Radar do Congresso |
 | M4 | Ideologia | IRT por MCMC (2+ cadeias), escala monotônica, faixas, intervalo de 90%, variante só com mérito | R-hat < 1,01; critérios da seção 8 da metodologia |
 | M5 | Validação | Relatório automático (Markdown/HTML) com todos os critérios | O relatório decide se os resultados podem ser publicados |
-| M6 | Exportação | JSON por deputado e por partido, com votações explicativas e links oficiais | Esquema documentado, pronto para o site |
+| M6 | Publicação | Tabelas de resultado no Neon (deputados, partidos, posições, governismo, votações explicativas com links oficiais), versionadas pela versão da metodologia | Carga idempotente; esquema documentado para o site |
 
 ## 5. Riscos já identificados nos testes
 
-- **Nome de bloco truncado** nas orientações (ex.: `Bl UniPpFdrPsdbCid...`). É preciso mapear pela API de blocos da Câmara ou por uma tabela curada com datas. Fazer em M2.
+- **Nome de bloco truncado** nas orientações (ex.: `Bl UniPpFdrPsdbCid...`), e a API da Câmara só informa os blocos atuais. *Resolvido em M2:* a fidelidade passa a ser medida contra a maioria da bancada do partido (metodologia, 5.3). A tabela bloco → partidos fica para depois, se for necessária.
+- **`votacoesObjetos` não indica o que foi votado:** lista todos os documentos ligados à proposição, até 885 por votação. *Resolvido em M2:* a separação entre mérito e procedimento usa o texto da descrição, com testes cobrindo os padrões reais.
 - **Votações com erro 504 permanente** na API: usar os arquivos em lote como fonte principal e a API só como complemento.
 - **Notas dos especialistas:** obter a base original dos autores e verificar a licença. Partidos fundidos depois do levantamento precisam de uma regra de proxy documentada.
-- **Votos vazios** (887 registros com `voto` em branco): investigar em M2 antes de tratar como ausência.
+- **Votos vazios** (887 registros com `voto` em branco). *Resolvido em M2:* são 2 votações secretas, ambas eleições ou indicações de pessoas. Ficam marcadas como `sem_votos_individuais` e são excluídas da análise individual.

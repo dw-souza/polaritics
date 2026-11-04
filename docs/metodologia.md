@@ -45,7 +45,8 @@ Por que as votações de procedimento entram: na prática, é com elas que o gov
 
 Ficam de fora (e isso é declarado ao usuário):
 - Votações simbólicas (sem registro individual).
-- Votações secretas.
+- Votações secretas e eleições de pessoas (ex.: indicações ao TCU, CNJ e CNMP).
+- Registros duplicados da mesma votação sob outro identificador. A Câmara às vezes repete a votação para cada proposição ligada a ela; os votos ficam só no registro principal, que é o usado.
 - Votações "quase unânimes" (minoria < 2,5%), que não trazem informação sobre posição.
 
 Codificação dos votos:
@@ -108,7 +109,9 @@ Este é o comparativo central do produto: **ideologia não é o mesmo que apoio 
   - **Governismo em votações disputadas (número principal):** só as votações em que a orientação do Governo é diferente da orientação da Oposição. Votar "com o governo" numa pauta que a oposição também apoia não é apoio ao governo, é consenso. Exemplo: a PEC 18/2025 (Segurança Pública) teve 487 votos Sim contra 15 Não, com PT e PL votando juntos. No teste, o governismo do PL cai de 32% (total) para 5% (disputadas).
 
 ### 5.3 Fidelidade partidária
-- Percentual de votos iguais à orientação do próprio partido na data do voto.
+- **Definição (v0.1):** percentual de votos iguais ao da **maioria da bancada do próprio partido** naquela votação. O partido é o da data do voto. O próprio deputado é excluído do cálculo da maioria, e só contam bancadas com ao menos 3 deputados votando Sim ou Não.
+- **Por que não pela orientação oficial do partido:** a Câmara publica muitas orientações por *bloco*, com nomes truncados (ex.: `Bl UniPpFdrPsdbCid...`). Ela também não publica o histórico de composição dos blocos, só os atuais. Ligar cada deputado à orientação certa exigiria uma tabela curada à mão. A maioria da bancada não depende de nenhuma curadoria e é uma medida usual na literatura.
+- **Futuro:** a fidelidade à orientação oficial pode ser adicionada quando houver uma tabela bloco → partidos documentada e com datas.
 
 ### 5.4 Como os três se combinam na página do parlamentar
 
