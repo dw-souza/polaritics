@@ -1,37 +1,8 @@
-import csv
-
 import duckdb
 import pytest
+from conftest import escrever, votacao, voto
 
 from polaritics.base.carga import construir_base
-
-
-def escrever(caminho, linhas):
-    with caminho.open("w", encoding="utf-8-sig", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(linhas[0]), delimiter=";", quoting=csv.QUOTE_ALL)
-        w.writeheader()
-        w.writerows(linhas)
-
-
-def votacao(id_, data, descricao, orgao="PLEN"):
-    return {
-        "id": id_,
-        "data": data,
-        "dataHoraRegistro": f"{data}T18:00:00",
-        "siglaOrgao": orgao,
-        "descricao": descricao,
-    }
-
-
-def voto(id_votacao, dep, data_hora, voto_, partido):
-    return {
-        "idVotacao": id_votacao,
-        "dataHoraVoto": data_hora,
-        "voto": voto_,
-        "deputado_id": dep,
-        "deputado_siglaPartido": partido,
-        "deputado_siglaUf": "SP",
-    }
 
 
 @pytest.fixture

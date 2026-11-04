@@ -104,6 +104,7 @@ Este é o comparativo central do produto: **ideologia não é o mesmo que apoio 
 - Obstrução contra a orientação do governo conta como voto contrário; ausência não entra no denominador.
 - **Sempre relativo ao governo do período.** Em 2023–2026 o governo é do PT; em outro mandato, governismo alto significa outra coisa. Governismo **nunca** é convertido em ideologia.
 - Calculado também por ano e por tema, para mostrar mudanças de comportamento (ex.: partidos que deixam a base).
+- **Exibição:** só para quem votou em ao menos 10% das votações orientadas do período (mesma regra da posição ideológica) e em ao menos 30 votações disputadas. Suplentes com passagem curta e deputados licenciados por muito tempo ficam como "dados insuficientes".
 - **Dois números, e o principal é o segundo:**
   - **Governismo total:** todas as votações em que o governo orientou.
   - **Governismo em votações disputadas (número principal):** só as votações em que a orientação do Governo é diferente da orientação da Oposição. Votar "com o governo" numa pauta que a oposição também apoia não é apoio ao governo, é consenso. Exemplo: a PEC 18/2025 (Segurança Pública) teve 487 votos Sim contra 15 Não, com PT e PL votando juntos. No teste, o governismo do PL cai de 32% (total) para 5% (disputadas).
@@ -215,6 +216,20 @@ Leituras:
 - A ordem dos partidos é coerente com os especialistas. Os deputados das pontas coincidem com os do GPS Partidário.
 - Partidos do centrão com ministérios (PP, UNIÃO, REPUBLICANOS, PODE) aparecem como centro-direita pelos votos, e não como direita, que é a classificação dos especialistas. O governismo deles fica entre 78% e 80%. É exatamente o efeito governo × ideologia da seção 5.5.
 - A decisão D1 (obstrução = Não) quase não altera o resultado. A decisão D2 (incluir procedimentos) altera mais, o que justifica manter a variante só com mérito sempre visível.
+
+## Anexo B — Validação do governismo e da fidelidade (M3, 04/11/2026)
+
+Dados: Câmara, 57ª legislatura, até out/2026. Cálculo pelo código do projeto (`polaritics medidas`).
+
+| Teste | Resultado | Referência |
+|---|---|---|
+| Governismo médio da Câmara, 2023–2024 | 74,1% | Radar do Congresso: 72%. Diferença de 2,1 p.p., dentro do critério de ≤ 3 p.p. da seção 8 |
+| Governismo médio, legislatura inteira | 71,7% total; 62,1% em votações disputadas | — |
+| Caroline de Toni (PL-SC), votos contra o governo | 75,5% (legislatura até out/2026) | Radar do Congresso: 72% "desde fevereiro de 2023", com data de corte diferente |
+| Deputados com dados suficientes | 565 | Igual ao número estimado pelo GPS Partidário (Folha) e pelo teste do anexo A |
+| Fidelidade mediana por partido | 79,9% (PRD) a 99,0% (NOVO) | GPS Partidário: 91,5% dos votos seguem a orientação do líder |
+
+Diferenças prováveis em relação ao Radar do Congresso: tratamento da obstrução, das abstenções e do período coberto. O Radar não publica essas regras com o mesmo detalhe.
 
 ## Referências
 

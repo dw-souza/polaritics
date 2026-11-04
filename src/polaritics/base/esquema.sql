@@ -63,6 +63,12 @@ create table orientacao (
     primary key (id_votacao, bancada)
 );
 
+-- Votações usadas em todas as medidas (metodologia, seção 3): nominais de plenário com votos
+-- individuais, exceto eleições de pessoas.
+create view votacao_valida as
+select * from votacao
+where orgao = 'PLEN' and nominal and not sem_votos_individuais and tipo <> 'eleicao';
+
 -- Filiação derivada do partido registrado em cada voto: períodos contínuos.
 create table filiacao (
     id_camara   varchar not null,
