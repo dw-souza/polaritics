@@ -25,7 +25,7 @@ Permitir que o eleitor compare **o que o parlamentar diz ser** (o partido e o es
 | Idem, Senado | Dados Abertos do Senado (`legis.senado.leg.br/dadosabertos`) | Fase 2. **A verificar:** disponibilidade da orientação do governo por votação |
 | Identidade, partido, candidaturas | TSE Dados Abertos | Chave de identidade entre mandatos e casas |
 | Classificação ideológica dos partidos | Bolognesi, Ribeiro, Codato & Silva, *Database on the ideological classification of all Brazilian political parties (2018-2022)*, Harvard Dataverse, doi:10.7910/DVN/MFIXKW, licença CC0. Respostas individuais de especialistas, escala 0–10, onda de 2022 | Âncora externa da escala. Média calculada pelo projeto a partir das respostas; arquivo com hash fixado |
-| Validação | Pesquisa Legislativa Brasileira (Power & Zucco, Harvard Dataverse), GPS Partidário 2026 (Folha), Radar do Congresso (Congresso em Foco) | Apenas para comparar resultados, nunca como insumo |
+| Validação | Pesquisa Legislativa Brasileira (Power & Zucco, Harvard Dataverse, doi:10.7910/DVN/WM9IZ8, CC0; onda de 2021, posição dos partidos atribuída pelos parlamentares, escala 1–10), GPS Partidário 2026 (Folha), Radar do Congresso (Congresso em Foco) | Apenas para comparar resultados, nunca como insumo. A PLB exige cadastro (guestbook) para download: o arquivo é baixado à mão, com hash fixado |
 
 Dados brutos são baixados, versionados por data de coleta e mantidos congelados para cada publicação.
 
@@ -211,7 +211,7 @@ Para cada parlamentar:
 | Teste | Critério de aceitação (v0.1) |
 |---|---|
 | Ordem das medianas partidárias × especialistas (Spearman) | ≥ 0,80 *(decisão D7)* |
-| Ordem das medianas partidárias × Pesquisa Legislativa Brasileira (Spearman) | ≥ 0,75 |
+| Ordem das medianas partidárias × Pesquisa Legislativa Brasileira (Spearman) | ≥ 0,75. **Não bloqueia** a publicação *(decisão D9)* |
 | Ordem dos partidos comparada ao GPS Partidário 2026 (votações) | Sem inversões entre famílias esquerda/centro/direita sem explicação documentada |
 | Governismo médio da Câmara comparado ao Radar do Congresso | Diferença ≤ 3 p.p. ou explicada pela regra de codificação |
 | Sensibilidade: todas as votações × só mérito | Correlação das posições individuais ≥ 0,90; parlamentares que mudam de faixa são listados e sinalizados |
@@ -243,6 +243,7 @@ Transparência: o critério D7 foi definido **depois** da primeira rodada comple
 | D6 | Visões selecionáveis (régua × votações) com visão padrão fixa: comportamento de voto + todas as votações (seção 4.2.1) | v0.1 |
 | D7 | Critério de publicação pela ordem dos partidos (Spearman); Pearson vira indicador acompanhado (seção 8) | v0.1 |
 | D8 | Zona de fronteira: faixa instável no bootstrap é exibida como par de faixas; critério de estabilidade passa a avaliar a classificação exibida (seções 4.3.1 e 8) | v0.2 |
+| D9 | Pesquisa Legislativa Brasileira como validação que não bloqueia: o download exige cadastro manual e não pode fazer parte da atualização automática. Mínimo de 10 respostas por partido; União = média de DEM e PSL; PRD sem nota (o Patriota não está na pesquisa) | v0.2 |
 | D5 | Âncora: base original de Bolognesi et al. (onda 2022, Harvard Dataverse, CC0), com hash fixado. Incorporação mantém a nota do partido incorporador; fusão recebe a média dos partidos de origem (PRD = média de PTB e Patriota) | v0.1 |
 
 ### Em aberto
@@ -297,13 +298,13 @@ Diferenças prováveis em relação ao Radar do Congresso: tratamento da obstru�
 | Versão | Data | Mudanças |
 |---|---|---|
 | 0.1 | 04/11/2026 | Primeira versão completa (decisões D1–D7). |
-| 0.2 | 04/11/2026 | Zona de fronteira e novo critério de estabilidade (D8), depois da reprovação do critério de faixa única. |
+| 0.2 | 04–05/11/2026 | Zona de fronteira e novo critério de estabilidade (D8), depois da reprovação do critério de faixa única. Validação com a Pesquisa Legislativa Brasileira (D9): Spearman 0,896 (todas as votações) e 0,907 (só mérito), 15 partidos. |
 
 ## Referências
 
 - Bolognesi, B.; Ribeiro, E.; Codato, A. (2023). Uma nova classificação ideológica dos partidos políticos brasileiros. *Dados*, 66(2). https://doi.org/10.1590/dados.2023.66.2.303
 - Bolognesi, B.; Ribeiro, E.; Codato, A.; Silva, B. F. O desaparecimento do centro ideológico no sistema partidário brasileiro. *Opinião Pública* (Unicamp).
-- Power, T.; Zucco, C. Brazilian Legislative Surveys. Harvard Dataverse. https://dataverse.harvard.edu/dataverse/bls
+- Power, T. J.; Zucco, C. (2023). Brazilian Legislative Surveys (Waves 1-9, 1990-2021). Harvard Dataverse, V1. https://doi.org/10.7910/DVN/WM9IZ8
 - Zucco, C. (2009). Ideology or what? Legislative behavior in multiparty presidential settings. *Journal of Politics*.
 - Zucco, C.; Lauderdale, B. (2011). Distinguishing between influences on Brazilian legislative behavior. *Legislative Studies Quarterly*.
 - Folha de S.Paulo / DeltaFolha. GPS Partidário 2026. https://github.com/deltafolha/gps-partidario-2026

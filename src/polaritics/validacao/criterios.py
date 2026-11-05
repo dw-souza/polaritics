@@ -8,7 +8,7 @@ import duckdb
 import numpy as np
 from scipy.stats import spearmanr
 
-from polaritics.config import DIR_BRUTOS
+from polaritics.coleta import bls
 from polaritics.medidas.ideologia.calculo import RHAT_MAX, preparar
 from polaritics.validacao import bootstrap, referencias
 
@@ -19,7 +19,6 @@ MIN_SPEARMAN_BLS = 0.75
 MAX_DIFERENCA_RADAR = 0.03
 MIN_CORRELACAO_VARIANTES = 0.90
 MIN_FRACAO_ESTAVEL = 0.90
-ARQUIVO_BLS = DIR_BRUTOS / "bls" / "BLS9_full.tab"
 
 
 @dataclass(frozen=True)
@@ -71,20 +70,34 @@ def distancia_especialistas(con, legislatura, variante) -> Resultado:
     )
 
 
-def ordem_bls(con, legislatura, variante, arquivo: Path = ARQUIVO_BLS) -> Resultado:
-    detalhe = (
-        "Os dados da Pesquisa Legislativa Brasileira (Harvard Dataverse, doi:10.7910/DVN/WM9IZ8) "
-        "exigem cadastro (guestbook) para download. Baixe BLS9_full.tab para data/raw/bls/."
-        if not arquivo.exists()
-        else "Arquivo presente; leitura ainda não implementada."
-    )
+def ordem_bls(con, legislatura, variante, arquivo: Path = bls.ARQUIVO) -> Resultado:
+    """Validação externa com dados baixados manualmente (guestbook): não bloqueia publicação."""
+    nome = "Ordem dos partidos × Pesquisa Legislativa Brasileira (Spearman)"
+    meta = f"≥ {MIN_SPEARMAN_BLS:.2f}"
+    if not bls.disponivel(arquivo):
+        return Resultado(
+            nome, variante, None, meta, "pendente",
+            f"Os dados ({bls.DOI}) exigem cadastro (guestbook) para download. "
+            "Baixe BLS9_full.tab para data/raw/bls/.",
+            obrigatorio=False,
+        )  # fmt: skip
+    referencia = bls.notas(arquivo)
+    medianas = con.execute(
+        """select partido, median(nota) from ideologia
+           where legislatura = ? and variante = ? and partido is not null
+           group by 1 having count(*) >= 3""",
+        [legislatura, variante],
+    ).fetchall()
+    pares = [(v, referencia[p]) for p, v in medianas if p in referencia]
+    rho = float(spearmanr(*zip(*pares, strict=True)).statistic)
     return Resultado(
-        "Ordem dos partidos × Pesquisa Legislativa Brasileira (Spearman)",
+        nome,
         variante,
-        None,
-        f"≥ {MIN_SPEARMAN_BLS:.2f}",
-        "pendente",
-        detalhe,
+        rho,
+        meta,
+        "aprovado" if rho >= MIN_SPEARMAN_BLS else "reprovado",
+        f"{len(pares)} partidos; onda {bls.ONDA}, posição atribuída pelos parlamentares "
+        f"(escala 1–10). Não bloqueia: o download é manual. Fonte: {bls.CITACAO}.",
         obrigatorio=False,
     )
 
