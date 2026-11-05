@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import time
+import zipfile
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -21,6 +22,8 @@ from polaritics.config import DIR_BRUTOS, LEGISLATURAS
 log = logging.getLogger(__name__)
 
 URL_BASE = "https://dadosabertos.camara.leg.br/arquivos"
+URL_API = "https://dadosabertos.camara.leg.br/api/v2"
+URL_COTA = "https://www.camara.leg.br/cotas/Ano-{ano}.csv.zip"
 
 # Arquivo → colunas que precisam existir (validação mínima do formato).
 ARQUIVOS_ANUAIS = {
@@ -30,7 +33,18 @@ ARQUIVOS_ANUAIS = {
     "votacoesObjetos": {"idVotacao", "proposicao_id", "proposicao_siglaTipo"},
     "votacoesProposicoes": {"idVotacao", "proposicao_id"},
     "proposicoesTemas": {"uriProposicao", "tema"},
+    # presença nas sessões do plenário
+    "eventos": {"id", "dataHoraInicio", "situacao", "descricaoTipo", "localCamara.nome"},
+    "eventosPresencaDeputados": {"idEvento", "idDeputado"},
+    # atividade legislativa (proposições apresentadas no ano e seus autores)
+    "proposicoes": {"id", "siglaTipo", "numero", "ano", "ementa", "ultimoStatus_descricaoSituacao"},
+    "proposicoesAutores": {"idProposicao", "idDeputadoAutor", "ordemAssinatura", "proponente"},
 }
+# Cota parlamentar (CEAP): um .zip por ano, publicado fora dos Dados Abertos.
+COLUNAS_COTA = {
+    "ideCadastro", "sgUF", "txtDescricao", "txtFornecedor", "txtCNPJCPF", "vlrLiquido",
+    "numMes", "numAno",
+}  # fmt: skip
 ARQUIVOS_UNICOS = {
     "deputados": {"uri", "nome", "idLegislaturaInicial"},
     "legislaturas": {"idLegislatura", "dataInicio", "dataFim"},
@@ -96,7 +110,59 @@ class ColetorCamara:
                     continue
                 # o arquivo do ano corrente pode ainda não existir (ex.: início de janeiro)
                 self.baixar(nome, ano, colunas, opcional=ano == hoje.year)
+            if atualizar or not (self.destino / f"cota-{ano}.csv").exists():
+                self.baixar_cota(ano, opcional=ano == hoje.year)
         self._salvar_manifesto()
+        self.coletar_historico(legislatura)
+
+    def baixar_cota(self, ano: int, opcional: bool = False) -> RegistroArquivo | None:
+        """Baixa o .zip da cota parlamentar do ano e extrai o CSV como cota-<ano>.csv."""
+        url = URL_COTA.format(ano=ano)
+        zip_tmp = self.destino / f"cota-{ano}.zip.parcial"
+        try:
+            sha256, tamanho = self._baixar_com_tentativas(url, zip_tmp)
+        except FileNotFoundError:
+            if opcional:
+                log.info("ainda não publicado: %s", url)
+                return None
+            raise ErroColeta(f"arquivo não encontrado: {url}") from None
+        arquivo = self.destino / f"cota-{ano}.csv"
+        csv_tmp = arquivo.with_suffix(".csv.parcial")
+        with zipfile.ZipFile(zip_tmp) as z:
+            membros = [m for m in z.namelist() if m.lower().endswith(".csv")]
+            if len(membros) != 1:
+                raise ErroColeta(f"{url}: esperado 1 CSV no zip, há {len(membros)}")
+            csv_tmp.write_bytes(z.read(membros[0]))
+        zip_tmp.unlink()
+        validar_colunas(csv_tmp, COLUNAS_COTA)
+        return self._registrar(url, arquivo, csv_tmp, sha256, tamanho)
+
+    def coletar_historico(self, legislatura: int) -> int:
+        """Histórico de exercício (posse, licença, reassunção) de cada deputado da
+        legislatura, pela API. Sempre atualizado: muda a cada licença ou reassunção."""
+        destino = self.destino / "historico"
+        destino.mkdir(parents=True, exist_ok=True)
+        ids = self._ids_da_legislatura(legislatura)
+        if len(ids) < 513:
+            raise ErroColeta(f"a API listou só {len(ids)} deputados na {legislatura}ª legislatura")
+        for i, id_ in enumerate(ids, 1):
+            tmp = destino / f"{id_}.json.parcial"
+            self._baixar_com_tentativas(f"{URL_API}/deputados/{id_}/historico", tmp)
+            tmp.replace(destino / f"{id_}.json")
+            if i % 100 == 0:
+                log.info("histórico %d/%d", i, len(ids))
+            time.sleep(0.05)
+        return len(ids)
+
+    def _ids_da_legislatura(self, legislatura: int) -> list[str]:
+        ids, url = [], f"{URL_API}/deputados?idLegislatura={legislatura}&itens=100"
+        while url:
+            resposta = self.cliente.get(url, headers={"Accept": "application/json"})
+            resposta.raise_for_status()
+            corpo = resposta.json()
+            ids += [str(d["id"]) for d in corpo["dados"]]
+            url = next((ln["href"] for ln in corpo["links"] if ln["rel"] == "next"), None)
+        return sorted(set(ids))
 
     def baixar(
         self, nome: str, ano: int | None, colunas: set[str], opcional: bool = False
@@ -112,6 +178,11 @@ class ColetorCamara:
                 return None
             raise ErroColeta(f"arquivo não encontrado: {url}") from None
         validar_colunas(temporario, colunas)
+        return self._registrar(url, arquivo, temporario, sha256, tamanho)
+
+    def _registrar(
+        self, url: str, arquivo: Path, temporario: Path, sha256: str, tamanho: int
+    ) -> RegistroArquivo:
         agora = datetime.now(UTC).isoformat(timespec="seconds")
         anterior = self.manifesto.get(arquivo.name)
         mudou = anterior is None or anterior.sha256 != sha256
@@ -147,7 +218,7 @@ class ColetorCamara:
     def _baixar(self, url: str, destino: Path) -> tuple[str, int]:
         hash_ = hashlib.sha256()
         tamanho = 0
-        with self.cliente.stream("GET", url) as resposta:
+        with self.cliente.stream("GET", url, headers={"Accept": "application/json"}) as resposta:
             if resposta.status_code == 404:
                 raise FileNotFoundError(url)
             resposta.raise_for_status()

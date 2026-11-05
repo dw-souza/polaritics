@@ -108,3 +108,57 @@ create table nota_especialistas (
     onda            integer not null,
     origem          varchar not null             -- direta | fusão de X + Y
 );
+
+-- Períodos em exercício do mandato (posse/reassunção até licença/fim), da API de histórico.
+create table exercicio (
+    id_camara   varchar not null,
+    legislatura integer not null,
+    inicio      date not null,
+    fim         date not null
+);
+
+-- Cota parlamentar (CEAP): uma linha por documento reembolsado.
+create table despesa (
+    id_camara   varchar not null,
+    uf          varchar,
+    ano         integer not null,
+    mes         integer not null,
+    categoria   varchar,
+    fornecedor  varchar,
+    cnpj_cpf    varchar,
+    valor       double not null
+);
+
+-- Valor mensal da cota por UF (Ato da Mesa 270/2023), usado como peso entre estados.
+create table cota_uf (
+    uf      varchar primary key,
+    valor   double not null
+);
+
+-- Sessões deliberativas do plenário e presenças registradas nelas.
+create table sessao (
+    id      varchar primary key,
+    data    date not null
+);
+
+create table presenca (
+    id_sessao   varchar not null,
+    id_camara   varchar not null
+);
+
+-- Proposições (PL, PLP, PEC, PDL) e seus autores.
+create table proposicao (
+    id              varchar primary key,
+    sigla_tipo      varchar not null,
+    numero          varchar,
+    ano             integer,
+    ementa          varchar,
+    situacao        varchar
+);
+
+create table autoria (
+    id_proposicao   varchar not null,
+    id_camara       varchar not null,
+    ordem           integer,
+    proponente      boolean
+);

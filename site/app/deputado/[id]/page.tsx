@@ -6,17 +6,23 @@ import { Foto } from "@/components/Foto";
 import { Regua, type Marcador } from "@/components/Regua";
 import { SeletorVisao } from "@/components/SeletorVisao";
 import {
+  atividade,
   deputado,
   fidelidade,
+  gastos,
   governismo,
   posicaoPartido,
   posicoes,
+  presenca,
   publicacaoAtual,
   rankingFidelidade,
+  rankingGastos,
   rankingGovernismo,
+  rankingPresenca,
   votacoesExplicativas,
+  type Atividade,
+  type Fidelidade as LinhaFidelidade,
   type Governismo as LinhaGovernismo,
-  type LinhaRanking,
   type Posicao,
 } from "@/lib/dados";
 import {
@@ -24,13 +30,17 @@ import {
   UFS,
   VOTACOES,
   cargo,
+  colocacao,
   ementaAtual,
   faixa,
   formatarDataCurta,
   formatarNota,
   formatarPct,
+  formatarReais,
+  formatarReaisCurto,
   fraseFaixa,
   lerVisao,
+  nomeCategoria,
   nomeCurtoGoverno,
 } from "@/lib/escala";
 
@@ -44,13 +54,6 @@ export default function PaginaDeputado(props: PageProps<"/deputado/[id]">) {
   );
 }
 
-// Posição no ranking (1 = maior valor), com empates dividindo a mesma posição.
-function colocacao(lista: LinhaRanking[], id: string) {
-  const eu = lista.find((l) => l.id_camara === id);
-  if (!eu) return null;
-  return { posicao: 1 + lista.filter((l) => l.valor > eu.valor).length, total: lista.length };
-}
-
 async function Ficha({ params, searchParams }: PageProps<"/deputado/[id]">) {
   const { id } = await params;
   const { regua, votacoes } = lerVisao(await searchParams);
@@ -59,26 +62,35 @@ async function Ficha({ params, searchParams }: PageProps<"/deputado/[id]">) {
   const dep = await deputado(id, pub.legislatura);
   if (!dep) notFound();
 
-  const [todas, gov, fid, partido, explicativas, rkGov, rkFid] = await Promise.all([
-    posicoes(id, pub.legislatura),
-    governismo(id, pub.legislatura),
-    fidelidade(id, pub.legislatura),
-    dep.partido ? posicaoPartido(dep.partido, pub.legislatura) : null,
-    votacoesExplicativas(id, pub.legislatura, votacoes),
-    rankingGovernismo(pub.legislatura),
-    rankingFidelidade(pub.legislatura),
-  ]);
+  const [todas, gov, fid, partido, explicativas, rkGov, rkFid, gst, pres, atv, rkGst, rkPres] =
+    await Promise.all([
+      posicoes(id, pub.legislatura),
+      governismo(id, pub.legislatura),
+      fidelidade(id, pub.legislatura),
+      dep.partido ? posicaoPartido(dep.partido, pub.legislatura) : null,
+      votacoesExplicativas(id, pub.legislatura, votacoes),
+      rankingGovernismo(pub.legislatura),
+      rankingFidelidade(pub.legislatura),
+      gastos(id, pub.legislatura),
+      presenca(id, pub.legislatura),
+      atividade(id, pub.legislatura),
+      rankingGastos(pub.legislatura),
+      rankingPresenca(pub.legislatura),
+    ]);
   const posicao = todas.find((p) => p.regua === regua && p.variante === votacoes);
   const padrao = todas.find((p) => p.regua === "voto" && p.variante === "todas");
   const principal = todas.find((p) => p.regua === "voto" && p.variante === votacoes);
   const outra = todas.find((p) => p.regua === "voto" && p.variante !== votacoes);
   const govGeral = gov.find((g) => g.periodo === "legislatura" && g.suficiente);
-  const fidGeral = fid.find((f) => f.periodo === "legislatura" && f.suficiente);
   const esp = partido?.especialistas ?? null;
   const bancada = partido?.votos.find((v) => v.variante === votacoes)?.nota_votos ?? null;
   const bancadaPadrao = partido?.votos.find((v) => v.variante === "todas")?.nota_votos ?? null;
   const posGov = colocacao(rkGov, id);
   const posFid = colocacao(rkFid, id);
+  const posGst = colocacao(rkGst, id, true);
+  const posPres = colocacao(rkPres, id);
+  const gstGeral = gst.periodos.find((g) => g.periodo === "legislatura" && g.suficiente);
+  const presGeral = pres.find((p) => p.periodo === "legislatura" && p.suficiente);
   const ufNome = dep.uf ? (UFS[dep.uf] ?? dep.uf) : null;
 
   return (
@@ -147,25 +159,48 @@ async function Ficha({ params, searchParams }: PageProps<"/deputado/[id]">) {
           </details>
         </div>
         <div className={estilos.bloco}>
-          <span className="rotulo">Fidelidade ao partido</span>
-          {fidGeral && fidGeral.taxa !== null ? (
+          <span className="rotulo">Presença no plenário</span>
+          {presGeral ? (
             <>
-              <span className={`${estilos.valor} num`}>{formatarPct(fidGeral.taxa)}</span>
+              <span className={`${estilos.valor} num`}>{formatarPct(presGeral.taxa)}</span>
               <span className={estilos.pos}>
-                {posFid && `${posFid.posicao}º mais fiel `}
+                {posPres && `${posPres.posicao}º de ${posPres.total} `}
                 <span>
-                  {posFid && `de ${posFid.total} · `}
-                  {fidGeral.n} votações
+                  {posPres && `· ${posPres.posicaoUf}º de ${posPres.totalUf} em ${posPres.uf}`}
                 </span>
               </span>
             </>
           ) : (
-            <span className={estilos.semDado}>Votos insuficientes</span>
+            <span className={estilos.semDado}>Sessões insuficientes</span>
           )}
           <details>
             <summary>O que é</summary>
-            Percentual de votos iguais ao da maioria da própria bancada, considerando o partido
-            na data de cada voto.
+            {presGeral
+              ? `Presença registrada em ${presGeral.presentes} das ${presGeral.sessoes} sessões deliberativas do plenário em que estava em exercício.`
+              : "Presença nas sessões deliberativas do plenário, contando só o tempo em exercício."}
+          </details>
+        </div>
+        <div className={estilos.bloco}>
+          <span className="rotulo">Cota parlamentar</span>
+          {gstGeral && gstGeral.por_mes !== null ? (
+            <>
+              <span className={`${estilos.valor} num`}>
+                {formatarReaisCurto(gstGeral.por_mes)}
+                <small>/mês</small>
+              </span>
+              <span className={estilos.pos}>
+                {posGst && `${posGst.posicaoUf}º de ${posGst.totalUf} em ${posGst.uf} `}
+                <span>{posGst && `· ${posGst.posicao}º de ${posGst.total} no país`}</span>
+              </span>
+            </>
+          ) : (
+            <span className={estilos.semDado}>Tempo de mandato insuficiente</span>
+          )}
+          <details>
+            <summary>O que é</summary>
+            Média mensal de reembolsos da cota em exercício. O 1º lugar é quem gasta menos. A
+            posição no país compara com a cota de cada estado. Não inclui passagens aéreas
+            emitidas pela própria Câmara, que não estão nos dados abertos.
           </details>
         </div>
       </section>
@@ -217,6 +252,11 @@ async function Ficha({ params, searchParams }: PageProps<"/deputado/[id]">) {
             da Câmara, que normalmente não vota.
           </p>
         )}
+      </section>
+
+      <section className={`secao ${estilos.duas}`}>
+        <CotaDetalhe gastos={gst} uf={dep.uf} />
+        <MandatoDetalhe atividade={atv} fidelidade={fid} posFid={posFid} sexo={dep.sexo} />
       </section>
 
       {govGeral && <GovernismoPorAno linhas={gov} />}
@@ -417,5 +457,131 @@ function GovernismoPorAno({ linhas }: { linhas: LinhaGovernismo[] }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+function CotaDetalhe({
+  gastos: g,
+  uf,
+}: {
+  gastos: Awaited<ReturnType<typeof gastos>>;
+  uf: string | null;
+}) {
+  const geral = g.periodos.find((p) => p.periodo === "legislatura");
+  if (!geral || geral.total === 0) {
+    return (
+      <div>
+        <div className="secao-cab">
+          <h2>Como gasta a cota</h2>
+        </div>
+        <p className="leitura">
+          {geral && geral.meses >= 1
+            ? "Não pediu reembolso da cota parlamentar nesta legislatura."
+            : "Sem gastos da cota registrados nesta legislatura."}
+        </p>
+      </div>
+    );
+  }
+  const maior = g.categorias[0]?.valor ?? 1;
+  return (
+    <div>
+      <div className="secao-cab">
+        <h2>Como gasta a cota</h2>
+      </div>
+      <p className="pequeno discreto">
+        {formatarReais(geral.total)} em reembolsos em {Math.round(geral.meses)} meses de
+        mandato{uf ? `, pela cota de ${UFS[uf] ?? uf}` : ""}. Por categoria:
+      </p>
+      <ul className={estilos.barras}>
+        {g.categorias.slice(0, 8).map((c) => (
+          <li key={c.categoria}>
+            <span>{nomeCategoria(c.categoria)}</span>
+            <span className={estilos.trilhoBarra} aria-hidden="true">
+              <i style={{ width: `${(c.valor / maior) * 100}%` }} />
+            </span>
+            <span className="num">{formatarReais(c.valor)}</span>
+          </li>
+        ))}
+      </ul>
+      {g.fornecedores.length > 0 && (
+        <p className="pequeno discreto">
+          Maiores fornecedores:{" "}
+          {g.fornecedores
+            .slice(0, 3)
+            .map((f) => `${f.fornecedor} (${formatarReais(f.valor)})`)
+            .join("; ")}
+          .
+        </p>
+      )}
+      <p className="pequeno discreto">
+        Não inclui passagens aéreas emitidas pelo sistema da própria Câmara, que não são
+        publicadas nos dados abertos.
+      </p>
+    </div>
+  );
+}
+
+function MandatoDetalhe({
+  atividade: a,
+  fidelidade: f,
+  posFid,
+  sexo,
+}: {
+  atividade: Atividade | null;
+  fidelidade: LinhaFidelidade[];
+  posFid: ReturnType<typeof colocacao>;
+  sexo: string | null;
+}) {
+  const fid = f.find((x) => x.periodo === "legislatura" && x.suficiente);
+  const autor = sexo === "F" ? "autora" : "autor";
+  return (
+    <div className="leitura">
+      <div className="secao-cab">
+        <h2>Atividade legislativa</h2>
+      </div>
+      {a ? (
+        <>
+          <p>
+            <span className="marca num">
+              {a.apresentados} {a.apresentados === 1 ? "projeto" : "projetos"}
+            </span>{" "}
+            apresentados como {autor} principal nesta legislatura (PL, PLP, PEC e PDL).{" "}
+            {a.aprovados_camara === 0
+              ? "Nenhum foi aprovado na Câmara até agora."
+              : `${a.aprovados_camara} ${a.aprovados_camara === 1 ? "foi aprovado" : "foram aprovados"} na Câmara${a.viraram_lei > 0 ? `, e ${a.viraram_lei} ${a.viraram_lei === 1 ? "virou lei" : "viraram lei"}` : ""}.`}
+          </p>
+          {a.aprovadas.length > 0 && (
+            <ul className={estilos.aprovadas}>
+              {a.aprovadas.slice(0, 5).map((x) => (
+                <li key={x.proposicao}>
+                  <a href={x.url}>{x.proposicao}</a>{" "}
+                  <span className="discreto">
+                    · {x.situacao === "Transformado em Norma Jurídica" ? "virou lei" : "aprovado na Câmara"}
+                  </span>
+                  {x.ementa && <span className={estilos.ementaCurta}>{ementaAtual(x.ementa)}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="pequeno discreto">
+            Quantidade não é qualidade: um projeto aprovado pesa mais que dez parados.
+          </p>
+        </>
+      ) : (
+        <p className="discreto">Sem projetos apresentados como {autor} principal.</p>
+      )}
+      <div className="secao-cab" style={{ marginTop: 24 }}>
+        <h2>Fidelidade ao partido</h2>
+      </div>
+      {fid && fid.taxa !== null ? (
+        <p>
+          Votou como a maioria da bancada em{" "}
+          <span className="marca num">{formatarPct(fid.taxa)}</span> das {fid.n} votações
+          comparáveis{posFid ? ` (${posFid.posicao}º mais fiel de ${posFid.total})` : ""}.
+        </p>
+      ) : (
+        <p className="discreto">Votos insuficientes para calcular.</p>
+      )}
+    </div>
   );
 }

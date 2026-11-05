@@ -84,3 +84,58 @@ def test_sucessor_atual_segue_fusoes():
     assert partidos.sucessor_atual("PTB") == "PRD"
     assert partidos.sucessor_atual("PSC") == "PODE"
     assert partidos.sucessor_atual("PT") == "PT"
+
+
+def test_periodos_em_exercicio_aceita_reassuncao_registrada_como_convocado():
+    from datetime import date
+
+    from polaritics.base.carga import periodos_em_exercicio
+
+    registros = [
+        {"dataHora": "2023-02-01T00:00", "situacao": None, "descricaoStatus": "Nome no início"},
+        {
+            "dataHora": "2025-01-01T11:00",
+            "situacao": "CONVOCADO",
+            "descricaoStatus": "DIVERSO - Convocação",
+        },
+        {
+            "dataHora": "2025-01-01T13:32",
+            "situacao": "Exercício",
+            "descricaoStatus": "Entrada - Posse de Suplente",
+        },
+        {
+            "dataHora": "2025-02-01T08:43",
+            "situacao": "SUPLENCIA",
+            "descricaoStatus": "Saída - Afastamento de Suplente",
+        },
+        {
+            "dataHora": "2025-02-03T13:17",
+            "situacao": "CONVOCADO",
+            "descricaoStatus": "DIVERSO - Aguardando Convocação",
+        },
+        {
+            "dataHora": "2025-02-03T13:18",
+            "situacao": "CONVOCADO",
+            "descricaoStatus": "Entrada - Reassunção / DIVERSO",
+        },
+        {
+            "dataHora": "2025-10-08T17:58",
+            "situacao": "SUPLENCIA",
+            "descricaoStatus": "Saída - Afastamento",
+        },
+        {
+            "dataHora": "2025-11-17T20:30",
+            "situacao": "Exercício",
+            "descricaoStatus": "Entrada - Reassunção",
+        },
+        {
+            "dataHora": "2025-11-20T10:00",
+            "situacao": "Exercício",
+            "descricaoStatus": "Alteração de partido",
+        },
+    ]
+    assert periodos_em_exercicio(registros, date(2026, 1, 31)) == [
+        (date(2025, 1, 1), date(2025, 2, 1)),
+        (date(2025, 2, 3), date(2025, 10, 8)),
+        (date(2025, 11, 17), date(2026, 1, 31)),
+    ]

@@ -1,6 +1,6 @@
 # Polaritics — Metodologia
 
-> **Status:** v0.2 (nov/2026). Nada é publicado sem passar pela validação da seção 8. O histórico de mudanças está no fim do documento.
+> **Status:** v0.3 (nov/2026). Nada é publicado sem passar pela validação da seção 8. O histórico de mudanças está no fim do documento.
 > Toda mudança de metodologia é versionada; cada resultado publicado indica a versão da metodologia que o gerou.
 
 ## Objetivo
@@ -246,6 +246,7 @@ Transparência: o critério D7 foi definido **depois** da primeira rodada comple
 | D7 | Critério de publicação pela ordem dos partidos (Spearman); Pearson vira indicador acompanhado (seção 8) | v0.1 |
 | D8 | Zona de fronteira: faixa instável no bootstrap é exibida como par de faixas; critério de estabilidade passa a avaliar a classificação exibida (seções 4.3.1 e 8) | v0.2 |
 | D9 | Pesquisa Legislativa Brasileira como validação que não bloqueia: o download exige cadastro manual e não pode fazer parte da atualização automática. Mínimo de 10 respostas por partido; União = média de DEM e PSL; PRD sem nota (o Patriota não está na pesquisa) | v0.2 |
+| D10 | Gastos da cota, presença e atividade legislativa medidos só no tempo em exercício; gastos comparados pela cota do estado (Ato 270/2023), sem afirmar percentual da cota (seção 11) | v0.3 |
 | D5 | Âncora: base original de Bolognesi et al. (onda 2022, Harvard Dataverse, CC0), com hash fixado. Incorporação mantém a nota do partido incorporador; fusão recebe a média dos partidos de origem (PRD = média de PTB e Patriota) | v0.1 |
 
 ### Em aberto
@@ -295,11 +296,39 @@ Dados: Câmara, 57ª legislatura, até out/2026. Cálculo pelo código do projet
 
 Diferenças prováveis em relação ao Radar do Congresso: tratamento da obstrução, das abstenções e do período coberto. O Radar não publica essas regras com o mesmo detalhe.
 
+## 11. Gastos da cota, presença e atividade legislativa *(decisão D10, v0.3)*
+
+Medidas descritivas, sem modelo estatístico. Todas usam só o tempo em que o deputado estava **em exercício**, para que suplentes e licenciados não sejam comparados pelos quatro anos.
+
+### 11.1 Períodos em exercício
+- Fonte: histórico oficial de cada deputado na API da Câmara (`/deputados/{id}/historico`): posse, licença, reassunção, suplência e fim de mandato.
+- **Entra** em exercício com situação "Exercício" ou com evento de entrada (posse, reassunção). Algumas reassunções vêm registradas com situação "CONVOCADO" e só são reconhecidas pelo evento de entrada. **Sai** com suplência, licença, fim de mandato, vacância, suspensão ou evento de saída. Outros registros (convocação aguardando posse, mudança de nome ou partido) não mudam o estado.
+- Verificação: depois da regra, só 5 meses com gasto da cota caem fora de um período em exercício, em 5 deputados (eram 590 com a regra inicial, que ignorava as reassunções como "CONVOCADO").
+
+### 11.2 Gastos da cota parlamentar (CEAP)
+- Fonte: arquivos anuais da cota (`camara.leg.br/cotas/Ano-AAAA.csv.zip`), valor líquido de cada documento.
+- **Gasto mensal** = total reembolsado ÷ meses em exercício, com meses parciais proporcionais aos dias (Ato da Mesa 43/2009, art. 11), até o último mês com dados.
+- **Comparação justa entre estados:** o ranking nacional ordena pelo gasto mensal dividido pela cota do estado, com os valores do Ato da Mesa 270/2023 (`dados/referencia/cota-uf-ato270-2023.csv`). A cota de Roraima é 40% maior que a do DF. O reajuste posterior foi uniforme (+13,75% em todas as UFs verificadas), então a ordem não depende da data do reajuste. A ficha mostra também a posição **dentro do estado**, a comparação mais direta.
+- **Limitação:** as passagens aéreas emitidas pelo sistema da Câmara (SIGEPA) aparecem no portal de transparência, mas **não estão em nenhum formato dos dados abertos** (CSV, JSON ou XML). Pelo portal, são cerca de 20% da cota. O site exibe o gasto em reais por mês e não afirma um "percentual da cota usado".
+- Fornecedores pessoa física (CPF) aparecem como "Pessoa física", sem nome.
+- Entram no ranking deputados com pelo menos 3 meses em exercício.
+- Conferência: o gasto da bancada da Bahia em 2025 deu R$ 16,2 milhões, contra R$ 17,5 milhões noticiados. A diferença tem o tamanho esperado das passagens emitidas pela Câmara.
+
+### 11.3 Presença
+- Sessões deliberativas do plenário encerradas (eventos da Câmara) e presenças registradas nelas.
+- **Presença** = sessões com presença registrada ÷ sessões realizadas enquanto o deputado estava em exercício. Entram deputados com pelo menos 20 sessões.
+
+### 11.4 Atividade legislativa
+- PL, PLP, PEC e PDL apresentados durante a legislatura em que o deputado é o **primeiro signatário**.
+- **Aprovado na Câmara:** situação atual que indica que a proposição saiu da Câmara aprovada (aguardando o Senado, envio ao Senado, autógrafos, sanção, apreciação de veto ou transformada em norma jurídica). **Virou lei:** "Transformado em Norma Jurídica".
+- O ranking é de **aprovados**, não de apresentados, porque quantidade não é qualidade.
+
 ## Histórico de versões
 
 | Versão | Data | Mudanças |
 |---|---|---|
 | 0.1 | 04/11/2026 | Primeira versão completa (decisões D1–D7). |
+| 0.3 | 05/11/2026 | Gastos da cota, presença e atividade legislativa (D10, seção 11). |
 | 0.2 | 04–05/11/2026 | Zona de fronteira e novo critério de estabilidade (D8), depois da reprovação do critério de faixa única. Validação com a Pesquisa Legislativa Brasileira (D9): Spearman 0,896 (todas as votações) e 0,907 (só mérito), 15 partidos. |
 
 ## Referências

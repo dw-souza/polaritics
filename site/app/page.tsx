@@ -19,8 +19,8 @@ export default async function Inicio() {
         <>
           <h1 className={estilos.titulo}>Quem é o seu deputado?</h1>
           <p className={estilos.lede}>
-            Veja como ele vota, o quanto acompanha o governo e onde fica na escala política. Só
-            com dados oficiais da Câmara.
+            Veja como ele vota, quanto gasta da cota parlamentar e quantas vezes aparece no
+            plenário. Só com dados oficiais da Câmara.
           </p>
         </>
       }

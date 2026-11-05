@@ -1,3 +1,5 @@
+import io
+import zipfile
 from datetime import date
 
 import httpx
@@ -7,6 +9,7 @@ from polaritics.coleta import camara
 from polaritics.coleta.camara import (
     ARQUIVOS_ANUAIS,
     ARQUIVOS_UNICOS,
+    COLUNAS_COTA,
     ColetorCamara,
     ErroColeta,
     anos_a_atualizar,
@@ -21,21 +24,48 @@ def csv_com(colunas, linhas=()):
     return ("﻿" + "\n".join([cabecalho, *linhas]) + "\n").encode()
 
 
+IDS_DEPUTADOS = [str(i) for i in range(1000, 1513)]  # 513, o mínimo aceito
+
+
+def zip_cota():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as z:
+        z.writestr("Ano.csv", csv_com(COLUNAS_COTA, ['"v1"']))
+    return buffer.getvalue()
+
+
 class ServidorFalso:
-    """Responde aos arquivos da Câmara; anos em `ausentes` retornam 404."""
+    """Responde aos arquivos da Câmara e à API; anos em `ausentes` retornam 404.
+    `pedidos` registra só os arquivos em lote; `historicos`, as chamadas de histórico."""
 
     def __init__(self, ausentes=(), falhas_transitorias=0):
         self.ausentes = set(ausentes)
         self.falhas_restantes = falhas_transitorias
         self.pedidos = []
+        self.historicos = []
         self.versao = "v1"
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
-        self.pedidos.append(request.url.path)
+        caminho = request.url.path
+        if caminho.endswith("/historico"):
+            self.historicos.append(caminho)
+            return httpx.Response(200, json={"dados": []})
+        if caminho == "/api/v2/deputados":
+            return httpx.Response(
+                200, json={"dados": [{"id": i} for i in IDS_DEPUTADOS], "links": []}
+            )
+        self.pedidos.append(caminho)
         if self.falhas_restantes:
             self.falhas_restantes -= 1
             return httpx.Response(503)
-        arquivo = request.url.path.rsplit("/", 1)[-1].removesuffix(".csv")
+        if caminho.startswith("/cotas/"):
+            ano = int(caminho.split("-")[1].split(".")[0])
+            return (
+                httpx.Response(404)
+                if ano in self.ausentes
+                else httpx.Response(200, content=zip_cota())
+            )
+        arquivo = caminho.rsplit("/", 1)[-1].removesuffix(".csv")
         nome, _, ano = arquivo.partition("-")
         if ano and int(ano) in self.ausentes:
             return httpx.Response(404)
@@ -62,8 +92,11 @@ def test_primeira_coleta_baixa_todos_os_anos_iniciados(tmp_path):
     servidor = ServidorFalso()
     c = coletor(tmp_path, servidor)
     c.coletar(57, hoje=HOJE)
-    esperados = len(ARQUIVOS_UNICOS) + 4 * len(ARQUIVOS_ANUAIS)
+    esperados = len(ARQUIVOS_UNICOS) + 4 * (len(ARQUIVOS_ANUAIS) + 1)  # +1: cota do ano
     assert len(servidor.pedidos) == esperados
+    assert len(servidor.historicos) == len(IDS_DEPUTADOS)
+    assert (tmp_path / "cota-2025.csv").exists()
+    assert (tmp_path / "historico" / "1000.json").exists()
     assert not any("2027" in p for p in servidor.pedidos)
     assert (tmp_path / "votacoes-2023.csv").exists()
     assert len(c.manifesto) == esperados

@@ -14,6 +14,7 @@ from polaritics.medidas.fidelidade import calcular_fidelidade
 from polaritics.medidas.governismo import calcular_governismo
 from polaritics.medidas.ideologia import irt
 from polaritics.medidas.ideologia.calculo import VARIANTES, calcular_ideologia
+from polaritics.medidas.mandato import calcular_atividade, calcular_gastos, calcular_presenca
 from polaritics.publicar import neon
 from polaritics.validacao import relatorio
 
@@ -53,6 +54,9 @@ def medidas(args: argparse.Namespace) -> None:
     with duckdb.connect(str(CAMINHO_BASE)) as con:
         calcular_governismo(con)
         calcular_fidelidade(con)
+        calcular_gastos(con, args.legislatura)
+        calcular_presenca(con, args.legislatura)
+        calcular_atividade(con, args.legislatura)
         media = con.execute(
             """select count(*), avg(taxa_total), avg(taxa_disputadas) from governismo
                where ano is null and suficiente and legislatura = ?""",

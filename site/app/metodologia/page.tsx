@@ -95,6 +95,32 @@ export default function Metodologia() {
       </section>
 
       <section className="secao leitura">
+        <h2>Presença, gastos e projetos</h2>
+        <p>
+          Todas essas medidas consideram só o tempo em que o deputado estava de fato no mandato,
+          segundo o histórico oficial de posse, licença e reassunção. Suplentes e quem se
+          licenciou para ser ministro, por exemplo, não são comparados pelos quatro anos.
+        </p>
+        <p>
+          <strong>Presença:</strong> sessões deliberativas do plenário com presença registrada,
+          entre as que aconteceram enquanto o deputado estava em exercício.
+        </p>
+        <p>
+          <strong>Cota parlamentar:</strong> média mensal de reembolsos. Como a cota de cada
+          estado tem um valor diferente (a de Roraima é 40% maior que a do DF, por causa das
+          passagens), a comparação nacional leva em conta a cota do estado, e a ficha mostra
+          também a posição entre os deputados do mesmo estado. As passagens aéreas emitidas pelo
+          sistema da própria Câmara não são publicadas nos dados abertos e ficam de fora.
+          Fornecedores pessoa física aparecem sem nome.
+        </p>
+        <p>
+          <strong>Projetos:</strong> PL, PLP, PEC e PDL apresentados como autor principal, e
+          quantos foram aprovados na Câmara ou viraram lei. Quantidade não é qualidade, por isso o
+          ranking é de projetos aprovados.
+        </p>
+      </section>
+
+      <section className="secao leitura">
         <h2>O que este site não mede</h2>
         <ul>
           <li>Discursos, projetos apresentados e atuação fora do plenário.</li>

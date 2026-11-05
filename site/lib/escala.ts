@@ -144,3 +144,53 @@ export const UFS: Record<string, string> = {
   RR: "Roraima", RS: "Rio Grande do Sul", SC: "Santa Catarina", SE: "Sergipe", SP: "São Paulo",
   TO: "Tocantins",
 };
+
+const fmtReais = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+const fmtMil = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+export const formatarReais = (n: number) => fmtReais.format(n);
+// "R$ 37,4 mil" para valores grandes, "R$ 820" para pequenos.
+export const formatarReaisCurto = (n: number) =>
+  n >= 1000 ? `R$ ${fmtMil.format(n / 1000)} mil` : fmtReais.format(n);
+
+// Nomes das categorias da cota como o cidadão reconhece.
+const CATEGORIAS: Record<string, string> = {
+  "DIVULGAÇÃO DA ATIVIDADE PARLAMENTAR.": "Divulgação do mandato",
+  "LOCAÇÃO OU FRETAMENTO DE VEÍCULOS AUTOMOTORES": "Aluguel de veículos",
+  "MANUTENÇÃO DE ESCRITÓRIO DE APOIO À ATIVIDADE PARLAMENTAR": "Escritório de apoio",
+  "COMBUSTÍVEIS E LUBRIFICANTES.": "Combustível",
+  "HOSPEDAGEM ,EXCETO DO PARLAMENTAR NO DISTRITO FEDERAL.": "Hospedagem",
+  TELEFONIA: "Telefonia",
+  "LOCAÇÃO OU FRETAMENTO DE AERONAVES": "Fretamento de aeronaves",
+  "SERVIÇO DE SEGURANÇA PRESTADO POR EMPRESA ESPECIALIZADA.": "Segurança",
+  "SERVIÇO DE TÁXI, PEDÁGIO E ESTACIONAMENTO": "Táxi, pedágio e estacionamento",
+  "PASSAGEM AÉREA - REEMBOLSO": "Passagens aéreas (reembolso)",
+  "PASSAGEM AÉREA - RPA": "Passagens aéreas (requisição)",
+  "FORNECIMENTO DE ALIMENTAÇÃO DO PARLAMENTAR": "Alimentação",
+  "LOCAÇÃO OU FRETAMENTO DE EMBARCAÇÕES": "Fretamento de embarcações",
+  "PASSAGENS TERRESTRES, MARÍTIMAS OU FLUVIAIS": "Passagens terrestres e fluviais",
+  "SERVIÇOS POSTAIS": "Correios",
+  "ASSINATURA DE PUBLICAÇÕES": "Assinaturas de publicações",
+  "PARTICIPAÇÃO EM CURSO, PALESTRA OU EVENTO SIMILAR": "Cursos e eventos",
+  "AQUISIÇÃO DE TOKENS E CERTIFICADOS DIGITAIS": "Certificado digital",
+};
+export const nomeCategoria = (c: string) =>
+  CATEGORIAS[c] ?? c.charAt(0) + c.slice(1).toLowerCase().replace(/\.$/, "");
+
+// Posição num ranking já ordenado (empates dividem a posição) e no estado.
+export function colocacao(
+  lista: { id_camara: string; uf: string | null; valor: number }[],
+  id: string,
+  crescente = false,
+) {
+  const eu = lista.find((l) => l.id_camara === id);
+  if (!eu) return null;
+  const melhor = (o: { valor: number }) => (crescente ? o.valor < eu.valor : o.valor > eu.valor);
+  const doEstado = lista.filter((l) => l.uf === eu.uf);
+  return {
+    posicao: 1 + lista.filter(melhor).length,
+    total: lista.length,
+    posicaoUf: 1 + doEstado.filter(melhor).length,
+    totalUf: doEstado.length,
+    uf: eu.uf,
+  };
+}

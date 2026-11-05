@@ -1,18 +1,23 @@
 """Constrói a base DuckDB a partir dos arquivos brutos. Sempre recria do zero (idempotente)."""
 
+import csv
+import json
 import logging
+from datetime import date, datetime
 from pathlib import Path
 
 import duckdb
 
 from polaritics.base import partidos, votacoes
 from polaritics.coleta import especialistas
-from polaritics.config import DIR_BRUTOS, DIR_PROCESSADOS, GOVERNOS, LEGISLATURAS
+from polaritics.config import DIR_BRUTOS, DIR_PROCESSADOS, GOVERNOS, LEGISLATURAS, RAIZ
 
 log = logging.getLogger(__name__)
 
 ESQUEMA = Path(__file__).with_name("esquema.sql")
 CAMINHO_BASE = DIR_PROCESSADOS / "polaritics.duckdb"
+COTA_UF = RAIZ / "dados" / "referencia" / "cota-uf-ato270-2023.csv"
+TIPOS_PROPOSICAO = ("PL", "PLP", "PEC", "PDL")
 
 
 def _csv(diretorio: Path, nome: str) -> str:
@@ -106,6 +111,121 @@ def _carregar_proposicoes(con: duckdb.DuckDBPyConnection, brutos: Path) -> None:
     """)
 
 
+def _tem(brutos: Path, padrao: str) -> bool:
+    return any(brutos.glob(f"{padrao}.csv"))
+
+
+SITUACOES_FORA = {"SUPLENCIA", "Licença", "FIM_MANDATO", "VACANCIA", "SUSPENSO"}
+
+
+def periodos_em_exercicio(registros: list[dict], fim_dados: date) -> list[tuple[date, date]]:
+    """Intervalos em exercício a partir do histórico oficial.
+
+    Entra em exercício com situação "Exercício" ou com um evento de entrada (posse,
+    reassunção): algumas reassunções vêm registradas com situação "CONVOCADO". Sai com
+    suplência, licença, fim de mandato, vacância, suspensão ou evento de saída. Os demais
+    registros (convocação aguardando posse, nome/partido) não mudam o estado.
+    """
+    # ordem pelo horário completo: há vários eventos no mesmo dia (convocação, posse)
+    eventos = [
+        (
+            datetime.fromisoformat(r["dataHora"]).date(),
+            r.get("situacao"),
+            r.get("descricaoStatus") or "",
+        )
+        for r in sorted(registros, key=lambda r: r["dataHora"])
+    ]
+    periodos, inicio = [], None
+    for dia, situacao, descricao in eventos:
+        entra = situacao == "Exercício" or descricao.startswith("Entrada")
+        sai = situacao in SITUACOES_FORA or descricao.startswith("Saída")
+        if entra and inicio is None:
+            inicio = dia
+        elif sai and not entra and inicio is not None:
+            periodos.append((inicio, dia))
+            inicio = None
+    if inicio is not None:
+        periodos.append((inicio, fim_dados))
+    return periodos
+
+
+def _carregar_exercicio(con: duckdb.DuckDBPyConnection, brutos: Path) -> None:
+    pasta = brutos / "historico"
+    if not pasta.exists():
+        log.warning("sem histórico de exercício em %s", pasta)
+        return
+    linhas = []
+    for arquivo in sorted(pasta.glob("*.json")):
+        registros = json.loads(arquivo.read_text(encoding="utf-8"))["dados"]
+        for n, leg in LEGISLATURAS.items():
+            for inicio, fim in periodos_em_exercicio(registros, leg.periodo.fim):
+                ini, fim = max(inicio, leg.periodo.inicio), min(fim, leg.periodo.fim)
+                if ini <= fim:
+                    linhas.append((arquivo.stem, n, ini, fim))
+    con.executemany("insert into exercicio values (?, ?, ?, ?)", linhas)
+
+
+def _carregar_cota(con: duckdb.DuckDBPyConnection, brutos: Path, tabela_uf: Path) -> None:
+    if tabela_uf.exists():
+        with tabela_uf.open(encoding="utf-8", newline="") as f:
+            linhas = csv.DictReader(linha for linha in f if not linha.startswith("#"))
+            con.executemany(
+                "insert into cota_uf values (?, ?)", [(r["uf"], float(r["valor"])) for r in linhas]
+            )
+    if not _tem(brutos, "cota-*"):
+        return
+    con.execute(f"""
+        insert into despesa
+        select ideCadastro, nullif(sgUF, ''), try_cast(numAno as integer),
+               try_cast(numMes as integer), nullif(txtDescricao, ''), nullif(txtFornecedor, ''),
+               nullif(regexp_replace(txtCNPJCPF, '[^0-9]', '', 'g'), ''),
+               try_cast(vlrLiquido as double)
+        from {_csv(brutos, "cota-*")}
+        where nullif(ideCadastro, '') is not null and try_cast(vlrLiquido as double) is not null
+    """)
+
+
+def _carregar_presenca(con: duckdb.DuckDBPyConnection, brutos: Path) -> None:
+    if not (_tem(brutos, "eventos-*") and _tem(brutos, "eventosPresencaDeputados-*")):
+        return
+    con.execute(f"""
+        insert into sessao
+        select distinct id, try_cast(dataHoraInicio as timestamp)::date
+        from {_csv(brutos, "eventos-*")}
+        where descricaoTipo = 'Sessão Deliberativa'
+          and "localCamara.nome" = 'Plenário da Câmara dos Deputados'
+          and situacao like 'Encerrada%'
+    """)
+    con.execute(f"""
+        insert into presenca
+        select distinct idEvento, idDeputado
+        from {_csv(brutos, "eventosPresencaDeputados-*")}
+        where idEvento in (select id from sessao)
+    """)
+
+
+def _carregar_atividade(con: duckdb.DuckDBPyConnection, brutos: Path) -> None:
+    if not (_tem(brutos, "proposicoes-*") and _tem(brutos, "proposicoesAutores-*")):
+        return
+    tipos = ", ".join(f"'{t}'" for t in TIPOS_PROPOSICAO)
+    con.execute(f"""
+        insert into proposicao
+        select id, siglaTipo, numero, try_cast(ano as integer), nullif(trim(ementa), ''),
+               nullif(ultimoStatus_descricaoSituacao, '')
+        from {_csv(brutos, "proposicoes-*")}
+        where siglaTipo in ({tipos})
+        qualify row_number() over (partition by id order by ano desc) = 1
+    """)
+    con.execute(f"""
+        insert into autoria
+        select distinct idProposicao, idDeputadoAutor, try_cast(ordemAssinatura as integer),
+               proponente = '1'
+        from {_csv(brutos, "proposicoesAutores-*")}
+        where nullif(idDeputadoAutor, '') is not null
+          and idProposicao in (select id from proposicao)
+    """)
+
+
 def _derivar_filiacao(con: duckdb.DuckDBPyConnection) -> None:
     # Votos consecutivos com o mesmo partido viram um período de filiação. A ordem inclui
     # id_votacao para desempatar votos registrados no mesmo segundo.
@@ -155,6 +275,10 @@ def construir_base(
         _carregar_referencias(con)
         _carregar_camara(con, brutos)
         _carregar_proposicoes(con, brutos)
+        _carregar_exercicio(con, brutos)
+        _carregar_cota(con, brutos, COTA_UF)
+        _carregar_presenca(con, brutos)
+        _carregar_atividade(con, brutos)
         _derivar_filiacao(con)
         _carregar_especialistas(con, arquivo_especialistas)
     temporario.replace(destino)

@@ -122,3 +122,71 @@ create table if not exists publicado.validacao (
 
 create index if not exists posicao_legislatura on publicado.posicao (legislatura, variante, regua);
 create index if not exists governismo_legislatura on publicado.governismo (legislatura, periodo);
+
+-- Gastos da cota (exceto passagens emitidas pela Câmara, ausentes dos dados abertos).
+-- periodo: 'legislatura' ou o ano; relativo = gasto mensal ÷ cota do estado (Ato 270/2023).
+create table if not exists publicado.gastos (
+    id_camara   text not null,
+    legislatura integer not null,
+    periodo     text not null,
+    uf          text,
+    meses       double precision not null,
+    total       double precision not null,
+    por_mes     double precision,
+    relativo    double precision,
+    suficiente  boolean not null,
+    primary key (id_camara, legislatura, periodo)
+);
+
+create table if not exists publicado.gastos_categoria (
+    id_camara   text not null,
+    legislatura integer not null,
+    categoria   text not null,
+    valor       double precision not null,
+    primary key (id_camara, legislatura, categoria)
+);
+
+-- Até 5 maiores fornecedores; pessoa física aparece sem nome.
+create table if not exists publicado.gastos_fornecedor (
+    id_camara   text not null,
+    legislatura integer not null,
+    ordem       integer not null,
+    fornecedor  text not null,
+    cnpj        text,
+    valor       double precision not null,
+    primary key (id_camara, legislatura, ordem)
+);
+
+-- Presença nas sessões deliberativas do plenário em que o deputado estava em exercício.
+create table if not exists publicado.presenca (
+    id_camara   text not null,
+    legislatura integer not null,
+    periodo     text not null,
+    sessoes     integer not null,
+    presentes   integer not null,
+    taxa        double precision not null,
+    suficiente  boolean not null,
+    primary key (id_camara, legislatura, periodo)
+);
+
+-- PL, PLP, PEC e PDL apresentados como primeiro autor na legislatura.
+create table if not exists publicado.atividade (
+    id_camara           text not null,
+    legislatura         integer not null,
+    apresentados        integer not null,
+    aprovados_camara    integer not null,
+    viraram_lei         integer not null,
+    suficiente          boolean not null,
+    primary key (id_camara, legislatura)
+);
+
+create table if not exists publicado.atividade_aprovadas (
+    id_camara       text not null,
+    legislatura     integer not null,
+    id_proposicao   text not null,
+    proposicao      text not null,
+    ementa          text,
+    situacao        text not null,
+    url             text not null,
+    primary key (id_camara, legislatura, id_proposicao)
+);

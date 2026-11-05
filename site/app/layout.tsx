@@ -24,7 +24,7 @@ const serif = Source_Serif_4({
 export const metadata: Metadata = {
   title: { default: "Polaritics", template: "%s · Polaritics" },
   description:
-    "Como cada deputado federal vota, o quanto acompanha o governo e onde fica na escala política. Só com dados oficiais da Câmara.",
+    "Como cada deputado federal vota, quanto gasta da cota, se vai às sessões e onde fica na escala política. Só com dados oficiais da Câmara.",
 };
 
 async function Rodape() {
@@ -57,7 +57,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div className="miolo">
           <header className={estilos.topo}>
             <Link href="/" className={estilos.nome}>
-              Polaritics<span>votos e governismo na Câmara</span>
+              Polaritics<span>votos, gastos e presença na Câmara</span>
             </Link>
             <nav className={estilos.abas} aria-label="Principal">
               <Link href="/">Deputados</Link>

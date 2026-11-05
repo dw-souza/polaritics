@@ -33,6 +33,12 @@ TABELAS_POR_LEGISLATURA = [
     "fidelidade",
     "votacao_explicativa",
     "validacao",
+    "gastos",
+    "gastos_categoria",
+    "gastos_fornecedor",
+    "presenca",
+    "atividade",
+    "atividade_aprovadas",
 ]
 
 
@@ -177,6 +183,7 @@ def _carregar(con: duckdb.DuckDBPyConnection, legislatura: int, variantes: list[
             where o.ordem <= {N_VOTACOES_EXPLICATIVAS}""",
         [legislatura, legislatura, variantes, legislatura],
     )
+    _carregar_mandato(con, legislatura)
     con.execute(
         """insert into pg.publicado.validacao
            select legislatura, criterio, variante, valor, meta, status, detalhe, obrigatorio,
@@ -190,6 +197,54 @@ def _carregar(con: duckdb.DuckDBPyConnection, legislatura: int, variantes: list[
                   max(data), now()
            from votacao_valida where legislatura = ?""",
         [legislatura, METODOLOGIA_VERSAO, variantes, legislatura],
+    )
+
+
+def _carregar_mandato(con: duckdb.DuckDBPyConnection, legislatura: int) -> None:
+    """Gastos da cota, presença e atividade legislativa (medidas/mandato.py)."""
+    p = [legislatura]
+    con.execute(
+        """insert into pg.publicado.gastos
+           select id_camara, legislatura, coalesce(ano::varchar, 'legislatura'), uf, meses,
+                  total, por_mes, relativo, suficiente
+           from gastos where legislatura = ?""",
+        p,
+    )
+    con.execute(
+        """insert into pg.publicado.gastos_categoria
+           select id_camara, legislatura, categoria, valor
+           from gastos_categoria where legislatura = ? and categoria is not null""",
+        p,
+    )
+    con.execute(
+        """insert into pg.publicado.gastos_fornecedor
+           select id_camara, legislatura,
+                  row_number() over (partition by id_camara order by valor desc),
+                  coalesce(fornecedor, 'Não informado'), cnpj, valor
+           from gastos_fornecedor where legislatura = ?""",
+        p,
+    )
+    con.execute(
+        """insert into pg.publicado.presenca
+           select id_camara, legislatura, coalesce(ano::varchar, 'legislatura'), sessoes,
+                  presentes, taxa, suficiente
+           from presenca_plenario where legislatura = ?""",
+        p,
+    )
+    con.execute(
+        """insert into pg.publicado.atividade
+           select id_camara, legislatura, apresentados, aprovados_camara, viraram_lei,
+                  suficiente
+           from atividade where legislatura = ?""",
+        p,
+    )
+    con.execute(
+        f"""insert into pg.publicado.atividade_aprovadas
+            select id_camara, legislatura, id,
+                   sigla_tipo || ' ' || numero || '/' || ano, ementa, situacao,
+                   '{URL_PROPOSICAO}' || id
+            from atividade_aprovadas where legislatura = ?""",
+        p,
     )
 
 

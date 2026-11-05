@@ -51,6 +51,33 @@ export type LinhaRanking = {
   uf: string | null;
   valor: number;
   n: number;
+  extra: number | null;
+};
+
+export type Gastos = {
+  periodo: string;
+  uf: string | null;
+  meses: number;
+  total: number;
+  por_mes: number | null;
+  relativo: number | null;
+  suficiente: boolean;
+};
+
+export type Presenca = {
+  periodo: string;
+  sessoes: number;
+  presentes: number;
+  taxa: number;
+  suficiente: boolean;
+};
+
+export type Atividade = {
+  apresentados: number;
+  aprovados_camara: number;
+  viraram_lei: number;
+  suficiente: boolean;
+  aprovadas: { proposicao: string; ementa: string | null; situacao: string; url: string }[];
 };
 
 export type Posicao = {
@@ -261,7 +288,7 @@ export async function rankingGovernismo(legislatura: number): Promise<LinhaRanki
   cacheTag("publicacao");
   return (await sql`
     select d.id_camara, d.nome, d.foto_url, m.partido_atual as partido, m.uf,
-           g.taxa_disputadas as valor, g.n_disputadas as n
+           g.taxa_disputadas as valor, g.n_disputadas as n, null as extra
     from publicado.governismo g
     join publicado.deputado d using (id_camara)
     join publicado.mandato m on m.id_camara = g.id_camara and m.legislatura = g.legislatura
@@ -275,10 +302,104 @@ export async function rankingFidelidade(legislatura: number): Promise<LinhaRanki
   cacheTag("publicacao");
   return (await sql`
     select d.id_camara, d.nome, d.foto_url, m.partido_atual as partido, m.uf,
-           f.taxa as valor, f.n
+           f.taxa as valor, f.n, null as extra
     from publicado.fidelidade f
     join publicado.deputado d using (id_camara)
     join publicado.mandato m on m.id_camara = f.id_camara and m.legislatura = f.legislatura
     where f.legislatura = ${legislatura} and f.periodo = 'legislatura' and f.suficiente
     order by f.taxa desc, d.nome`) as LinhaRanking[];
+}
+
+export async function gastos(
+  id: string,
+  legislatura: number,
+): Promise<{
+  periodos: Gastos[];
+  categorias: { categoria: string; valor: number }[];
+  fornecedores: { fornecedor: string; cnpj: string | null; valor: number }[];
+}> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("publicacao");
+  const [periodos, categorias, fornecedores] = await Promise.all([
+    sql`select periodo, uf, meses, total, por_mes, relativo, suficiente from publicado.gastos
+        where id_camara = ${id} and legislatura = ${legislatura} order by periodo`,
+    sql`select categoria, valor from publicado.gastos_categoria
+        where id_camara = ${id} and legislatura = ${legislatura} order by valor desc`,
+    sql`select fornecedor, cnpj, valor from publicado.gastos_fornecedor
+        where id_camara = ${id} and legislatura = ${legislatura} order by ordem`,
+  ]);
+  return {
+    periodos: periodos as Gastos[],
+    categorias: categorias as { categoria: string; valor: number }[],
+    fornecedores: fornecedores as { fornecedor: string; cnpj: string | null; valor: number }[],
+  };
+}
+
+export async function presenca(id: string, legislatura: number): Promise<Presenca[]> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("publicacao");
+  return (await sql`
+    select periodo, sessoes, presentes, taxa, suficiente from publicado.presenca
+    where id_camara = ${id} and legislatura = ${legislatura} order by periodo`) as Presenca[];
+}
+
+export async function atividade(id: string, legislatura: number): Promise<Atividade | null> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("publicacao");
+  const [linha] = await sql`
+    select apresentados, aprovados_camara, viraram_lei, suficiente from publicado.atividade
+    where id_camara = ${id} and legislatura = ${legislatura}`;
+  if (!linha) return null;
+  const aprovadas = await sql`
+    select proposicao, ementa, situacao, url from publicado.atividade_aprovadas
+    where id_camara = ${id} and legislatura = ${legislatura}
+    order by situacao = 'Transformado em Norma Jurídica' desc, proposicao`;
+  return { ...(linha as Omit<Atividade, "aprovadas">), aprovadas: aprovadas as Atividade["aprovadas"] };
+}
+
+// Gastos: valor = gasto mensal ÷ cota do estado (menor = mais econômico); extra = R$/mês.
+export async function rankingGastos(legislatura: number): Promise<LinhaRanking[]> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("publicacao");
+  return (await sql`
+    select d.id_camara, d.nome, d.foto_url, m.partido_atual as partido, g.uf,
+           g.relativo as valor, round(g.meses)::int as n, g.por_mes as extra
+    from publicado.gastos g
+    join publicado.deputado d using (id_camara)
+    join publicado.mandato m on m.id_camara = g.id_camara and m.legislatura = g.legislatura
+    where g.legislatura = ${legislatura} and g.periodo = 'legislatura' and g.suficiente
+    order by g.relativo, d.nome`) as LinhaRanking[];
+}
+
+export async function rankingPresenca(legislatura: number): Promise<LinhaRanking[]> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("publicacao");
+  return (await sql`
+    select d.id_camara, d.nome, d.foto_url, m.partido_atual as partido, m.uf,
+           p.taxa as valor, p.sessoes as n, p.presentes as extra
+    from publicado.presenca p
+    join publicado.deputado d using (id_camara)
+    join publicado.mandato m on m.id_camara = p.id_camara and m.legislatura = p.legislatura
+    where p.legislatura = ${legislatura} and p.periodo = 'legislatura' and p.suficiente
+    order by p.taxa desc, d.nome`) as LinhaRanking[];
+}
+
+// Atividade: valor = projetos aprovados na Câmara; n = apresentados; extra = viraram lei.
+export async function rankingAtividade(legislatura: number): Promise<LinhaRanking[]> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("publicacao");
+  return (await sql`
+    select d.id_camara, d.nome, d.foto_url, m.partido_atual as partido, m.uf,
+           a.aprovados_camara as valor, a.apresentados as n, a.viraram_lei as extra
+    from publicado.atividade a
+    join publicado.deputado d using (id_camara)
+    join publicado.mandato m on m.id_camara = a.id_camara and m.legislatura = a.legislatura
+    where a.legislatura = ${legislatura} and a.suficiente
+    order by a.aprovados_camara desc, a.viraram_lei desc, d.nome`) as LinhaRanking[];
 }
