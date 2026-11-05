@@ -197,7 +197,7 @@ Caso típico: um governo de esquerda prioriza uma pauta de segurança pública, 
 ## 6. Explicabilidade
 
 Para cada parlamentar:
-- **Votações que mais pesaram** na sua posição (maior discriminação do item × divergência em relação à mediana), cada uma com ementa, voto, orientação do partido, orientação do governo e link oficial.
+- **Votações que mais pesaram** na sua posição: as 8 com maior *discriminação da votação × direção do voto*, no sentido da posição do deputado em relação ao centro da Câmara. São os votos que mais o empurraram para o lado em que está. Uma por projeto (a de maior peso, quando o mesmo projeto teve várias votações). Cada uma traz a proposição principal (ex.: "PL 709/2023") com ementa, o tipo (mérito ou procedimento), o voto, a orientação do governo e links para a página do projeto e o registro oficial da votação.
 - Contagem de votações consideradas, ausências e votos excluídos.
 - Versão da metodologia e data dos dados.
 

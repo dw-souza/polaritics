@@ -12,3 +12,7 @@ dist/
 
 # sistema
 .DS_Store
+
+# credenciais locais
+.env
+.env.*

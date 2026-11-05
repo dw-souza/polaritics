@@ -13,6 +13,7 @@ from polaritics.config import LEGISLATURAS
 from polaritics.medidas.fidelidade import calcular_fidelidade
 from polaritics.medidas.governismo import calcular_governismo
 from polaritics.medidas.ideologia.calculo import VARIANTES, calcular_ideologia
+from polaritics.publicar import neon
 from polaritics.validacao import relatorio
 
 
@@ -83,6 +84,11 @@ def validar(args: argparse.Namespace) -> None:
     print(f"relatório em data/published/validacao-{args.legislatura}.md")
 
 
+def publicar(args: argparse.Namespace) -> None:
+    variantes = neon.publicar(args.legislatura)
+    print(f"publicado no Postgres: legislatura {args.legislatura} ({', '.join(variantes)})")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="polaritics")
     sub = parser.add_subparsers(required=True)
@@ -108,6 +114,10 @@ def main() -> None:
     p.add_argument("--legislatura", type=int, choices=sorted(LEGISLATURAS), default=57)
     p.add_argument("--replicas", type=int, default=100, help="réplicas do bootstrap (0 = pular)")
     p.set_defaults(func=validar)
+
+    p = sub.add_parser("publicar", help="publica os resultados validados no Postgres (Neon)")
+    p.add_argument("--legislatura", type=int, choices=sorted(LEGISLATURAS), default=57)
+    p.set_defaults(func=publicar)
 
     p = sub.add_parser("base", help="constrói a base DuckDB a partir dos dados brutos")
     p.set_defaults(func=base)

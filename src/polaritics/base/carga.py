@@ -92,6 +92,20 @@ def _carregar_camara(con: duckdb.DuckDBPyConnection, brutos: Path) -> None:
     """)
 
 
+def _carregar_proposicoes(con: duckdb.DuckDBPyConnection, brutos: Path) -> None:
+    # Só enriquece a explicação das votações; as medidas não dependem disto.
+    if not any(brutos.glob("votacoesProposicoes-*.csv")):
+        log.warning("sem votacoesProposicoes em %s; votações ficarão sem proposição", brutos)
+        return
+    con.execute(f"""
+        insert into votacao_proposicao
+        select distinct idVotacao, proposicao_id, proposicao_siglaTipo, proposicao_numero,
+               proposicao_ano, nullif(trim(proposicao_ementa), '')
+        from {_csv(brutos, "votacoesProposicoes-*")}
+        where idVotacao in (select id from votacao) and proposicao_id is not null
+    """)
+
+
 def _derivar_filiacao(con: duckdb.DuckDBPyConnection) -> None:
     # Votos consecutivos com o mesmo partido viram um período de filiação. A ordem inclui
     # id_votacao para desempatar votos registrados no mesmo segundo.
@@ -140,6 +154,7 @@ def construir_base(
         _registrar_funcoes(con)
         _carregar_referencias(con)
         _carregar_camara(con, brutos)
+        _carregar_proposicoes(con, brutos)
         _derivar_filiacao(con)
         _carregar_especialistas(con, arquivo_especialistas)
     temporario.replace(destino)

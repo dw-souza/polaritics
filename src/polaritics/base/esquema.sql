@@ -64,6 +64,27 @@ create table orientacao (
     primary key (id_votacao, bancada)
 );
 
+create table votacao_proposicao (
+    id_votacao      varchar not null,
+    id_proposicao   varchar not null,
+    sigla_tipo      varchar,
+    numero          varchar,
+    ano             varchar,
+    ementa          varchar
+);
+
+-- Proposição principal de cada votação: prioriza o projeto (PEC, PL, MP...) sobre
+-- requerimentos e outros documentos ligados à mesma votação.
+create view votacao_proposicao_principal as
+select * from votacao_proposicao
+qualify row_number() over (
+    partition by id_votacao
+    order by case sigla_tipo when 'PEC' then 1 when 'PLP' then 2 when 'PL' then 3
+                             when 'MPV' then 4 when 'PLV' then 5 when 'PDL' then 6
+                             when 'PRC' then 7 else 9 end,
+             id_proposicao
+) = 1;
+
 -- Votações usadas em todas as medidas (metodologia, seção 3): nominais de plenário com votos
 -- individuais, exceto eleições de pessoas.
 create view votacao_valida as

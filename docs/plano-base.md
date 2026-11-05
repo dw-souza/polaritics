@@ -79,4 +79,5 @@ Pensado para receber o Senado, novas legislaturas e, no futuro, as câmaras muni
 - **`votacoesObjetos` não indica o que foi votado:** lista todos os documentos ligados à proposição, até 885 por votação. *Resolvido em M2:* a separação entre mérito e procedimento usa o texto da descrição, com testes cobrindo os padrões reais.
 - **Votações com erro 504 permanente** na API: usar os arquivos em lote como fonte principal e a API só como complemento.
 - **Notas dos especialistas:** obter a base original dos autores e verificar a licença. Partidos fundidos depois do levantamento precisam de uma regra de proxy documentada.
+- **Base recriada do zero apaga os resultados do modelo:** `polaritics base` recria o arquivo DuckDB. Hoje isso é aceitável porque o pipeline completo roda em sequência; se o MCMC ficar caro demais, separar os resultados do modelo num arquivo próprio.
 - **Votos vazios** (887 registros com `voto` em branco). *Resolvido em M2:* são 2 votações secretas, ambas eleições ou indicações de pessoas. Ficam marcadas como `sem_votos_individuais` e são excluídas da análise individual.
