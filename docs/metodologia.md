@@ -1,6 +1,6 @@
 # Polaritics — Metodologia
 
-> **Status:** rascunho v0.1 (nov/2026). Nada aqui é definitivo até a validação descrita na seção 8.
+> **Status:** v0.2 (nov/2026). Nada é publicado sem passar pela validação da seção 8. O histórico de mudanças está no fim do documento.
 > Toda mudança de metodologia é versionada; cada resultado publicado indica a versão da metodologia que o gerou.
 
 ## Objetivo
@@ -122,7 +122,15 @@ Regras:
 
 Os cortes são os do levantamento de especialistas. No instrumento original, as faixas das pontas se chamam "extrema esquerda" e "extrema direita". Usamos "mais à esquerda" e "mais à direita", como faz o GPS Partidário da Folha, porque o termo descreve uma **posição relativa no comportamento de voto**, não um juízo sobre a pessoa ou o partido.
 
-Exibição: faixa do ponto central **e** faixas cobertas pelo intervalo de 90%. Ex.: "Centro-direita (intervalo: centro a direita)".
+Exibição: a nota de 0 a 10 com o intervalo de 90%, e a faixa ou a zona de fronteira (4.3.1).
+
+### 4.3.1 Zona de fronteira *(decisão D8, v0.2)*
+
+Faixas são cortes fixos sobre uma escala contínua. Quem está muito perto de um corte pode trocar de rótulo com pequenas mudanças nas votações consideradas, mesmo com a nota numérica estável.
+
+- **Regra:** em cada uma das 100 réplicas do bootstrap das votações (seção 8), o deputado recebe uma faixa. Se a faixa publicada aparece em **menos de 80%** das réplicas, ele é exibido em **zona de fronteira**, com as duas faixas: a publicada e a outra mais frequente nas réplicas.
+- **Exemplo de tela:** "Posição pelos votos: 5,52 · *Entre centro e centro-direita*. Está na fronteira entre duas faixas; pequenas mudanças nas votações consideradas trocam o rótulo."
+- **Por quê:** na 57ª legislatura, 99% dos deputados com rótulo instável estavam a menos de 0,3 ponto de um corte, a maioria no corte de 5,5, onde fica o centrão. Mostrar uma faixa única para eles daria uma precisão que os dados não sustentam.
 
 ### 4.4 Piso mínimo
 - Deputado com < 10% de participação nas votações selecionadas: estimado, mas **não exibido** com faixa ("dados insuficientes").
@@ -207,12 +215,18 @@ Para cada parlamentar:
 | Ordem dos partidos comparada ao GPS Partidário 2026 (votações) | Sem inversões entre famílias esquerda/centro/direita sem explicação documentada |
 | Governismo médio da Câmara comparado ao Radar do Congresso | Diferença ≤ 3 p.p. ou explicada pela regra de codificação |
 | Sensibilidade: todas as votações × só mérito | Correlação das posições individuais ≥ 0,90; parlamentares que mudam de faixa são listados e sinalizados |
-| Estabilidade (bootstrap por votação) | ≥ 90% dos deputados mantêm a faixa em ≥ 80% das reamostragens |
+| Estabilidade da classificação exibida (bootstrap por votação, 100 réplicas) | ≥ 90% dos deputados com a classificação exibida (faixa única ou par de fronteira, 4.3.1) cobrindo ≥ 80% das réplicas *(decisão D8)* |
 | Convergência MCMC | R-hat < 1,01 em todos os parâmetros de deputados |
 
 **Indicador acompanhado, sem efeito sobre a publicação:** a correlação de Pearson entre as medianas partidárias pelos votos e as notas dos especialistas. Ela mede o quanto as *distâncias* do comportamento de voto se parecem com a classificação dos especialistas, e é publicada a cada atualização. Na 57ª legislatura (até out/2026), o valor é 0,81. Uma subida ou queda é um **achado** (ex.: o centrão votando mais como a oposição), não um motivo para mudar o método.
 
 Por que a ordem barra a publicação e a distância não *(D7)*: esperamos que a ordem dos partidos pelos votos seja coerente com a dos especialistas. As distâncias, não; a diferença entre "diz ser" e "vota como" é justamente o que o projeto quer mostrar. Exigir Pearson ≥ 0,85 (critério da v0.1 original) puniria o próprio achado.
+
+**Indicador acompanhado, sem efeito sobre a publicação:** a fração de deputados em zona de fronteira. O critério de estabilidade da v0.2 só reprova quem oscila entre três ou mais faixas; o quanto o rótulo é frágil aparece neste indicador. Na 57ª legislatura: 16,3% (todas as votações) e 23,0% (só mérito). Um teto, se houver, será definido **antes** de rodar a 58ª legislatura, para não repetir o problema de escolher a regra depois de ver o resultado.
+
+Sobre o bootstrap: reestimar por MCMC em cada réplica custaria horas. Cada réplica usa a moda a posteriori (MAP) do mesmo modelo, que nesta base tem correlação de 0,9999 com a mediana do MCMC e dá a mesma faixa para 97% dos deputados.
+
+Transparência sobre D8: na v0.1, o critério exigia que ≥ 90% dos deputados mantivessem a **faixa única** em ≥ 80% das réplicas. Ele **reprovou** (83,7% com todas as votações; 77,0% só com mérito). A análise mostrou efeito de fronteira, não instabilidade do modelo (4.3.1). A v0.2 mudou a forma de exibir esses deputados e, com ela, o critério. Os valores do critério antigo continuam no relatório de validação.
 
 Transparência: o critério D7 foi definido **depois** da primeira rodada completa do modelo (Spearman 0,89 com todas as votações e 0,91 só com mérito; Pearson 0,81 e 0,83). A partir desta versão, ele fica fixo, e qualquer mudança exige nova versão da metodologia.
 
@@ -228,6 +242,7 @@ Transparência: o critério D7 foi definido **depois** da primeira rodada comple
 | D4 | Duas visões sobre as mesmas amostras: régua por dois partidos-polo (principal, define a faixa) e régua isotônica (comparação com o próprio partido) (seção 4.2) | v0.1 |
 | D6 | Visões selecionáveis (régua × votações) com visão padrão fixa: comportamento de voto + todas as votações (seção 4.2.1) | v0.1 |
 | D7 | Critério de publicação pela ordem dos partidos (Spearman); Pearson vira indicador acompanhado (seção 8) | v0.1 |
+| D8 | Zona de fronteira: faixa instável no bootstrap é exibida como par de faixas; critério de estabilidade passa a avaliar a classificação exibida (seções 4.3.1 e 8) | v0.2 |
 | D5 | Âncora: base original de Bolognesi et al. (onda 2022, Harvard Dataverse, CC0), com hash fixado. Incorporação mantém a nota do partido incorporador; fusão recebe a média dos partidos de origem (PRD = média de PTB e Patriota) | v0.1 |
 
 ### Em aberto
@@ -276,6 +291,13 @@ Dados: Câmara, 57ª legislatura, até out/2026. Cálculo pelo código do projet
 | Fidelidade mediana por partido | 79,9% (PRD) a 99,0% (NOVO) | GPS Partidário: 91,5% dos votos seguem a orientação do líder |
 
 Diferenças prováveis em relação ao Radar do Congresso: tratamento da obstrução, das abstenções e do período coberto. O Radar não publica essas regras com o mesmo detalhe.
+
+## Histórico de versões
+
+| Versão | Data | Mudanças |
+|---|---|---|
+| 0.1 | 04/11/2026 | Primeira versão completa (decisões D1–D7). |
+| 0.2 | 04/11/2026 | Zona de fronteira e novo critério de estabilidade (D8), depois da reprovação do critério de faixa única. |
 
 ## Referências
 

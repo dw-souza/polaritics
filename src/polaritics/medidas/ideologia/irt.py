@@ -64,6 +64,40 @@ def valor_inicial(m: MatrizVotos, esquerda: np.ndarray, direita: np.ndarray) -> 
     return -x if x[esquerda].mean() > x[direita].mean() else x
 
 
+def estimar_map(
+    m: MatrizVotos, esquerda: np.ndarray, direita: np.ndarray, max_iter: int = 2000
+) -> np.ndarray:
+    """Moda a posteriori do mesmo modelo (mesmas prioris), por L-BFGS. Muito mais rápida que o
+    MCMC e sem incerteza: usada no bootstrap de estabilidade, não nos resultados publicados.
+    Retorna theta padronizado e com o sinal alinhado."""
+    from scipy.optimize import minimize
+
+    n_dep, n_vot = m.forma
+    D, V, y = m.i_dep, m.i_vot, m.y.astype(float)
+
+    def objetivo(p):
+        theta, alpha, beta = p[:n_dep], p[n_dep : n_dep + n_vot], p[n_dep + n_vot :]
+        eta = beta[V] * theta[D] - alpha[V]
+        r = 1 / (1 + np.exp(-eta)) - y
+        nll = np.sum(np.logaddexp(0, eta) - y * eta)
+        prior = 0.5 * theta @ theta + alpha @ alpha / 50 + beta @ beta / 12.5
+        grad = np.concatenate(
+            [
+                np.bincount(D, r * beta[V], n_dep) + theta,
+                np.bincount(V, -r, n_vot) + alpha / 25,
+                np.bincount(V, r * theta[D], n_vot) + beta / 6.25,
+            ]
+        )
+        return nll + prior, grad
+
+    inicio = valor_inicial(m, esquerda, direita)
+    p0 = np.concatenate([inicio, np.zeros(n_vot), np.full(n_vot, 0.1)])
+    p = minimize(objetivo, p0, jac=True, method="L-BFGS-B", options={"maxiter": max_iter}).x
+    theta = p[:n_dep]
+    theta = (theta - theta.mean()) / theta.std()
+    return -theta if theta[esquerda].mean() > theta[direita].mean() else theta
+
+
 def _alinhar_e_padronizar(theta, alpha, beta, esquerda, direita):
     """Por cadeia: inverte o sinal se esquerda > direita. Por amostra: padroniza theta e
     ajusta alpha/beta para que o preditor linear não mude."""

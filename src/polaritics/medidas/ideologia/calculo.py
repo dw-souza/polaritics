@@ -1,6 +1,7 @@
 """Orquestra a posição ideológica: matriz de votos → IRT → escala 0–10 → faixas → tabelas."""
 
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import duckdb
@@ -68,43 +69,87 @@ def partido_na_legislatura(con: duckdb.DuckDBPyConnection, legislatura: int) -> 
     )
 
 
-def calcular_ideologia(
-    con: duckdb.DuckDBPyConnection, legislatura: int, variante: str = "todas", **mcmc
-) -> bool:
-    """Estima e grava as tabelas `ideologia*`. Retorna se o modelo convergiu."""
+@dataclass(frozen=True)
+class Referencias:
+    """Partidos de referência da régua: polos (visão principal) e todos com nota (secundária)."""
+
+    partido_dep: np.ndarray  # partido de cada deputado da matriz
+    notas: dict[str, float]  # nota dos especialistas por partido
+    referencias: list[str]  # partidos com nota e ≥ MIN_DEPUTADOS_ANCORA deputados
+    polos: tuple[str, str]  # maior partido de cada polo
+    membros: dict[str, np.ndarray]
+    pesos: np.ndarray
+
+    @classmethod
+    def montar(cls, partido_dep: np.ndarray, notas: dict[str, float]) -> "Referencias":
+        contagem = {p: int((partido_dep == p).sum()) for p in set(partido_dep) if p}
+        referencias = sorted(
+            p for p, n in contagem.items() if p in notas and n >= MIN_DEPUTADOS_ANCORA
+        )
+        polo_esq = max((p for p in referencias if notas[p] < LIMITE_ESQUERDA), key=contagem.get)
+        polo_dir = max((p for p in referencias if notas[p] > LIMITE_DIREITA), key=contagem.get)
+        return cls(
+            partido_dep,
+            notas,
+            referencias,
+            (polo_esq, polo_dir),
+            {p: np.flatnonzero(partido_dep == p) for p in referencias},
+            np.array([contagem[p] for p in referencias], dtype=float),
+        )
+
+    @property
+    def esquerda(self) -> np.ndarray:
+        """Deputados de partidos classificados abaixo de 4,5 (fixam o sinal do modelo)."""
+        return self._por_nota(lambda n: n < LIMITE_ESQUERDA)
+
+    @property
+    def direita(self) -> np.ndarray:
+        return self._por_nota(lambda n: n > LIMITE_DIREITA)
+
+    def _por_nota(self, condicao) -> np.ndarray:
+        return np.flatnonzero(
+            [p in self.notas and condicao(self.notas[p]) for p in self.partido_dep]
+        )
+
+    def nota_polos(self, theta: np.ndarray) -> np.ndarray:
+        """Visão principal: régua linear fixada pelos dois partidos-polo."""
+        esq, dir_ = self.polos
+        return escala.ajustar_polos(
+            np.median(theta[self.membros[esq]]),
+            self.notas[esq],
+            np.median(theta[self.membros[dir_]]),
+            self.notas[dir_],
+        )(theta)
+
+    def nota_campo(self, theta: np.ndarray) -> np.ndarray:
+        """Visão secundária: cada partido perto da própria nota de especialistas."""
+        medianas = np.array([np.median(theta[self.membros[p]]) for p in self.referencias])
+        alvo = np.array([self.notas[p] for p in self.referencias])
+        return escala.ajustar(medianas, alvo, self.pesos)(theta)
+
+
+def preparar(con: duckdb.DuckDBPyConnection, legislatura: int, variante: str):
+    """Matriz de votos e referências da régua para a legislatura e variante."""
     m = montar_matriz(con, legislatura, variante)
     partido = partido_na_legislatura(con, legislatura)
     notas = dict(con.execute("select partido, nota from nota_especialistas").fetchall())
     partido_dep = np.array([partido.get(d) for d in m.deputados], dtype=object)
-    nota_dep = np.array([notas.get(p, np.nan) for p in partido_dep], dtype=float)
-    esquerda = np.flatnonzero(nota_dep < LIMITE_ESQUERDA)
-    direita = np.flatnonzero(nota_dep > LIMITE_DIREITA)
+    return m, Referencias.montar(partido_dep, notas)
+
+
+def calcular_ideologia(
+    con: duckdb.DuckDBPyConnection, legislatura: int, variante: str = "todas", **mcmc
+) -> bool:
+    """Estima e grava as tabelas `ideologia*`. Retorna se o modelo convergiu."""
+    m, ref = preparar(con, legislatura, variante)
     log.info("matriz %s × %s (%s votos), variante %s", *m.forma, len(m.y), variante)
 
-    r = irt.estimar(m, esquerda, direita, **mcmc)
+    r = irt.estimar(m, ref.esquerda, ref.direita, **mcmc)
+    nota_voto = np.array([ref.nota_polos(theta) for theta in r.theta])
+    nota_campo = np.array([ref.nota_campo(theta) for theta in r.theta])
 
-    r = irt.estimar(m, esquerda, direita, **mcmc)
-
-    contagem = {p: int((partido_dep == p).sum()) for p in set(partido_dep) if p}
-    referencias = sorted(p for p, n in contagem.items() if p in notas and n >= MIN_DEPUTADOS_ANCORA)
-    polo_esq = max((p for p in referencias if notas[p] < LIMITE_ESQUERDA), key=contagem.get)
-    polo_dir = max((p for p in referencias if notas[p] > LIMITE_DIREITA), key=contagem.get)
-    membros = {p: np.flatnonzero(partido_dep == p) for p in referencias}
-    pesos = np.array([contagem[p] for p in referencias], dtype=float)
-    alvo = np.array([notas[p] for p in referencias])
-
-    nota_voto = np.empty_like(r.theta)  # visão principal: régua fixada pelos dois polos
-    nota_campo = np.empty_like(r.theta)  # visão secundária: partidos na nota dos especialistas
-    for k, theta in enumerate(r.theta):
-        mediana = {p: np.median(theta[idx]) for p, idx in membros.items()}
-        nota_voto[k] = escala.ajustar_polos(
-            mediana[polo_esq], notas[polo_esq], mediana[polo_dir], notas[polo_dir]
-        )(theta)
-        medianas = np.array([mediana[p] for p in referencias])
-        nota_campo[k] = escala.ajustar(medianas, alvo, pesos)(theta)
-
-    _gravar(con, legislatura, variante, m, partido_dep, r, nota_voto, nota_campo)
-    _gravar_diagnostico(con, legislatura, variante, m, r, (polo_esq, polo_dir), referencias)
+    _gravar(con, legislatura, variante, m, ref.partido_dep, r, nota_voto, nota_campo)
+    _gravar_diagnostico(con, legislatura, variante, m, r, ref.polos, ref.referencias)
     log.info("R-hat máx %.4f, ESS mín %.0f, divergências %d", r.rhat_max, r.ess_min, r.divergencias)
     return r.rhat_max < RHAT_MAX
 
