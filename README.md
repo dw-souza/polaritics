@@ -30,7 +30,11 @@ uv run polaritics publicar    # carrega no Postgres só o que foi aprovado (~5 s
 
 `publicar` lê a conexão direta (unpooled) do Neon da variável `POLARITICS_DATABASE_URL`, no ambiente ou num arquivo `.env` local. O `.env` fica fora do git.
 
-A validação com a Pesquisa Legislativa Brasileira usa um arquivo baixado manualmente, porque o Dataverse exige cadastro (guestbook). Veja `src/polaritics/coleta/bls.py`.
+A validação com a Pesquisa Legislativa Brasileira usa um arquivo baixado manualmente, porque o Dataverse exige cadastro (guestbook). O repositório guarda só o resumo por partido, em `dados/referencia/`, para a atualização automática. Veja `src/polaritics/coleta/bls.py`.
+
+### Atualização automática
+
+O workflow [atualizar.yml](.github/workflows/atualizar.yml) roda o pipeline inteiro todo sábado às 06:00 (Brasília) e também pode ser disparado à mão, em *Actions → Atualização semanal → Run workflow*, com a opção de só calcular e validar, sem publicar. Ele precisa do secret `POLARITICS_DATABASE_URL` (conexão unpooled do Neon) nas configurações do repositório. O relatório de validação aparece no resumo da execução e fica guardado como artefato por 90 dias.
 
 ## Licenças
 

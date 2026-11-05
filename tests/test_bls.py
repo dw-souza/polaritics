@@ -21,3 +21,13 @@ def test_notas_media_da_onda_2021_ignora_ausentes_e_poucas_respostas(tmp_path):
     assert "REDE" not in notas
     assert notas["UNIÃO"] == 8  # fusão DEM + PSL
     assert "PRD" not in notas  # falta o Patriota
+
+
+def test_resumo_exportado_e_lido_sem_o_arquivo_bruto(tmp_path):
+    bruto = tmp_path / "bls.tab"
+    escrever_tab(bruto, [{"wave": "2021", "lrpt": 2, "lrpl": 8} for _ in range(10)])
+    resumo = tmp_path / "resumo.csv"
+    bls.exportar_resumo(resumo, bruto, verificar_hash=False)
+    assert resumo.read_text(encoding="utf-8").startswith("# Power")
+    lido = bls.notas(tmp_path / "inexistente.tab", resumo=resumo)
+    assert lido == {"PT": 2.0, "PL": 8.0}

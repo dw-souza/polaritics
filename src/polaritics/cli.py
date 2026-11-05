@@ -12,6 +12,7 @@ from polaritics.coleta.camara import ColetorCamara, checar_sanidade
 from polaritics.config import LEGISLATURAS
 from polaritics.medidas.fidelidade import calcular_fidelidade
 from polaritics.medidas.governismo import calcular_governismo
+from polaritics.medidas.ideologia import irt
 from polaritics.medidas.ideologia.calculo import VARIANTES, calcular_ideologia
 from polaritics.publicar import neon
 from polaritics.validacao import relatorio
@@ -63,6 +64,7 @@ def medidas(args: argparse.Namespace) -> None:
 
 
 def ideologia(args: argparse.Namespace) -> None:
+    irt.habilitar_cadeias_paralelas(args.cadeias)
     with duckdb.connect(str(CAMINHO_BASE)) as con:
         for variante in args.variante:
             convergiu = calcular_ideologia(

@@ -43,6 +43,12 @@ class Resultado:
     divergencias: int
 
 
+def habilitar_cadeias_paralelas(cadeias: int = 2) -> None:
+    """Expõe núcleos da CPU como dispositivos JAX para rodar as cadeias em paralelo. Precisa
+    ser chamada antes do primeiro cálculo com JAX."""
+    numpyro.set_host_device_count(cadeias)
+
+
 def modelo(i_dep, i_vot, n_dep, n_vot, y=None):
     theta = numpyro.sample("theta", dist.Normal(0.0, 1.0).expand([n_dep]))
     alpha = numpyro.sample("alpha", dist.Normal(0.0, 5.0).expand([n_vot]))
@@ -128,7 +134,8 @@ def estimar(
         num_warmup=aquecimento,
         num_samples=amostras,
         num_chains=cadeias,
-        chain_method="sequential",
+        # em paralelo quando há um dispositivo por cadeia (ver `habilitar_cadeias_paralelas`)
+        chain_method="parallel" if jax.local_device_count() >= cadeias else "sequential",
         progress_bar=False,
     )
     mcmc.run(

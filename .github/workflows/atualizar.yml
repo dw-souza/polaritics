@@ -1,0 +1,62 @@
+name: Atualização semanal
+
+# Coleta os dados oficiais, recalcula as medidas e o modelo, valida e publica no Neon.
+# A publicação só acontece se a validação aprovar (o comando `publicar` recusa o contrário).
+
+on:
+  schedule:
+    - cron: "0 9 * * 6" # sábado, 06:00 em Brasília (a Câmara vota de terça a quinta)
+  workflow_dispatch:
+    inputs:
+      publicar:
+        description: "Publicar no Neon (desmarque para só calcular e validar)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atualizacao
+  cancel-in-progress: false
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-extras
+
+      - name: Coletar dados oficiais
+        run: uv run polaritics coletar --legislatura 57
+      - name: Montar a base
+        run: uv run polaritics base
+      - name: Governismo e fidelidade
+        run: uv run polaritics medidas --legislatura 57
+      - name: Posição ideológica (MCMC)
+        run: uv run polaritics ideologia --legislatura 57
+      - name: Validar
+        run: uv run polaritics validar --legislatura 57
+
+      - name: Resumo da validação
+        if: always()
+        run: cat data/published/validacao-57.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Publicar no Neon
+        if: github.event_name == 'schedule' || inputs.publicar
+        env:
+          POLARITICS_DATABASE_URL: ${{ secrets.POLARITICS_DATABASE_URL }}
+        run: uv run polaritics publicar --legislatura 57
+
+      - name: Guardar relatório e manifesto dos dados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atualizacao-${{ github.run_number }}
+          path: |
+            data/published/
+            data/raw/camara/manifesto.json
+          retention-days: 90
+          if-no-files-found: ignore
