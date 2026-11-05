@@ -1,5 +1,6 @@
 """Orquestra a posição ideológica: matriz de votos → IRT → escala 0–10 → faixas → tabelas."""
 
+import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -149,7 +150,7 @@ def calcular_ideologia(
     nota_campo = np.array([ref.nota_campo(theta) for theta in r.theta])
 
     _gravar(con, legislatura, variante, m, ref.partido_dep, r, nota_voto, nota_campo)
-    _gravar_diagnostico(con, legislatura, variante, m, r, ref.polos, ref.referencias)
+    _gravar_diagnostico(con, legislatura, variante, m, r, ref)
     log.info("R-hat máx %.4f, ESS mín %.0f, divergências %d", r.rhat_max, r.ess_min, r.divergencias)
     return r.rhat_max < RHAT_MAX
 
@@ -164,17 +165,18 @@ def _gravar(con, legislatura, variante, m, partido_dep, r, nota_voto, nota_campo
     campo50, campo05, campo95 = _resumo(nota_campo)
     theta50 = np.median(r.theta, axis=0)
     n_votos = np.bincount(m.i_dep, minlength=len(m.deputados))
-    con.execute("""create table if not exists ideologia (
+    con.execute("""create table if not exists modelo.ideologia (
         id_camara varchar, legislatura integer, variante varchar, partido varchar,
         n_votos integer, theta double,
         nota double, nota_p05 double, nota_p95 double,
         faixa varchar, faixa_p05 varchar, faixa_p95 varchar,
         nota_campo double, nota_campo_p05 double, nota_campo_p95 double)""")
     con.execute(
-        "delete from ideologia where legislatura = ? and variante = ?", [legislatura, variante]
+        "delete from modelo.ideologia where legislatura = ? and variante = ?",
+        [legislatura, variante],
     )
     con.executemany(
-        "insert into ideologia values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "insert into modelo.ideologia values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (
                 d,
@@ -196,16 +198,16 @@ def _gravar(con, legislatura, variante, m, partido_dep, r, nota_voto, nota_campo
             for i, d in enumerate(m.deputados)
         ],
     )
-    con.execute("""create table if not exists ideologia_votacao (
+    con.execute("""create table if not exists modelo.ideologia_votacao (
         id_votacao varchar, legislatura integer, variante varchar,
         alpha double, beta double)""")
     con.execute(
-        "delete from ideologia_votacao where legislatura = ? and variante = ?",
+        "delete from modelo.ideologia_votacao where legislatura = ? and variante = ?",
         [legislatura, variante],
     )
     alpha50, beta50 = np.median(r.alpha, axis=0), np.median(r.beta, axis=0)
     con.executemany(
-        "insert into ideologia_votacao values (?, ?, ?, ?, ?)",
+        "insert into modelo.ideologia_votacao values (?, ?, ?, ?, ?)",
         [
             (v, legislatura, variante, float(alpha50[j]), float(beta50[j]))
             for j, v in enumerate(m.votacoes)
@@ -213,18 +215,29 @@ def _gravar(con, legislatura, variante, m, partido_dep, r, nota_voto, nota_campo
     )
 
 
-def _gravar_diagnostico(con, legislatura, variante, m, r, polos, referencias):
-    con.execute("""create table if not exists ideologia_diagnostico (
+def impressao(m: irt.MatrizVotos, ref: Referencias) -> str:
+    """Hash dos dados de entrada do modelo (votos, votações, partidos e notas). Se a base for
+    reconstruída com os mesmos votos, a impressão não muda e o modelo continua válido."""
+    h = hashlib.sha256()
+    for parte in (m.deputados, m.votacoes, list(ref.partido_dep), sorted(ref.notas.items())):
+        h.update(repr(parte).encode())
+    for arr in (m.i_dep, m.i_vot, m.y):
+        h.update(np.ascontiguousarray(arr).tobytes())
+    return h.hexdigest()
+
+
+def _gravar_diagnostico(con, legislatura, variante, m, r, ref):
+    con.execute("""create table if not exists modelo.ideologia_diagnostico (
         legislatura integer, variante varchar, n_deputados integer, n_votacoes integer,
         n_votos integer, rhat_max double, ess_min double, divergencias integer,
         convergiu boolean, polos varchar, partidos_referencia varchar,
-        versao_metodologia varchar, calculado_em timestamp)""")
+        versao_metodologia varchar, calculado_em timestamp, impressao varchar)""")
     con.execute(
-        "delete from ideologia_diagnostico where legislatura = ? and variante = ?",
+        "delete from modelo.ideologia_diagnostico where legislatura = ? and variante = ?",
         [legislatura, variante],
     )
     con.execute(
-        "insert into ideologia_diagnostico values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        f"insert into modelo.ideologia_diagnostico values ({', '.join(['?'] * 14)})",
         [
             legislatura,
             variante,
@@ -234,9 +247,10 @@ def _gravar_diagnostico(con, legislatura, variante, m, r, polos, referencias):
             r.ess_min,
             r.divergencias,
             r.rhat_max < RHAT_MAX,
-            ",".join(polos),
-            ",".join(referencias),
+            ",".join(ref.polos),
+            ",".join(ref.referencias),
             METODOLOGIA_VERSAO,
             datetime.now(UTC).replace(tzinfo=None),
+            impressao(m, ref),
         ],
     )

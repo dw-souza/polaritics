@@ -71,13 +71,13 @@ def gerar(
     veredito = {v: publicavel(resultados, v) for v in ("todas", "merito")}
     gerado_em = datetime.now(UTC).replace(tzinfo=None)
 
-    con.execute("""create table if not exists validacao (
+    con.execute("""create table if not exists modelo.validacao (
         legislatura integer, criterio varchar, variante varchar, valor double, meta varchar,
         status varchar, detalhe varchar, obrigatorio boolean, versao_metodologia varchar,
         gerado_em timestamp)""")
-    con.execute("delete from validacao where legislatura = ?", [legislatura])
+    con.execute("delete from modelo.validacao where legislatura = ?", [legislatura])
     con.executemany(
-        "insert into validacao values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "insert into modelo.validacao values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [(legislatura, *asdict(r).values(), METODOLOGIA_VERSAO, gerado_em) for r in resultados],
     )
     destino.mkdir(parents=True, exist_ok=True)

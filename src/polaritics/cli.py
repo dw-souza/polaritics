@@ -7,6 +7,7 @@ from datetime import date
 import duckdb
 
 from polaritics.base.carga import CAMINHO_BASE, construir_base
+from polaritics.base.conexao import conectar
 from polaritics.coleta import especialistas
 from polaritics.coleta.camara import ColetorCamara, checar_sanidade
 from polaritics.config import LEGISLATURAS
@@ -69,7 +70,7 @@ def medidas(args: argparse.Namespace) -> None:
 
 def ideologia(args: argparse.Namespace) -> None:
     irt.habilitar_cadeias_paralelas(args.cadeias)
-    with duckdb.connect(str(CAMINHO_BASE)) as con:
+    with conectar() as con:
         for variante in args.variante:
             convergiu = calcular_ideologia(
                 con,
@@ -83,7 +84,7 @@ def ideologia(args: argparse.Namespace) -> None:
 
 
 def validar(args: argparse.Namespace) -> None:
-    with duckdb.connect(str(CAMINHO_BASE)) as con:
+    with conectar() as con:
         veredito = relatorio.gerar(con, args.legislatura, replicas=args.replicas)
     for variante, ok in veredito.items():
         print(f"{variante}: {'publicável' if ok else 'NÃO publicável'}")

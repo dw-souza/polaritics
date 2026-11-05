@@ -17,7 +17,7 @@ uv run ruff check .    # verifica o estilo do código
 
 ## Pipeline
 
-Cada etapa lê o resultado da anterior. `base` recria a base local do zero; por isso, depois dela rode as etapas seguintes.
+Cada etapa lê o resultado da anterior. `base` recria do zero a base de dados (`data/processed/polaritics.duckdb`). Os resultados do modelo e da validação ficam em outro arquivo (`data/processed/modelo.duckdb`) e sobrevivem a isso. Se os votos não mudaram, dá para reconstruir a base, recalcular as `medidas` e `publicar` sem rodar o modelo de novo. Se mudaram, `publicar` recusa e pede para rodar `ideologia` e `validar`: o modelo guarda uma impressão digital (hash) dos votos que usou.
 
 ```bash
 uv run polaritics coletar     # baixa os dados da Câmara e as notas dos especialistas (~20 s)

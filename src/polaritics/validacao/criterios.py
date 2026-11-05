@@ -224,16 +224,16 @@ def estabilidade(con, legislatura, variante, replicas: int) -> Resultado:
 
 
 def _gravar_exibicao(con, legislatura, variante, deputados, exibicoes) -> None:
-    con.execute("""create table if not exists ideologia_exibicao (
+    con.execute("""create table if not exists modelo.ideologia_exibicao (
         id_camara varchar, legislatura integer, variante varchar, faixa_publicada varchar,
         fracao_mesma_faixa double, fronteira boolean, faixa_exibida varchar,
         cobertura double)""")
     con.execute(
-        "delete from ideologia_exibicao where legislatura = ? and variante = ?",
+        "delete from modelo.ideologia_exibicao where legislatura = ? and variante = ?",
         [legislatura, variante],
     )
     con.executemany(
-        "insert into ideologia_exibicao values (?, ?, ?, ?, ?, ?, ?, ?)",
+        "insert into modelo.ideologia_exibicao values (?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (
                 d,

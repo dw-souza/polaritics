@@ -12,8 +12,9 @@ from pathlib import Path
 import duckdb
 
 from polaritics import METODOLOGIA_VERSAO
-from polaritics.base.carga import CAMINHO_BASE
+from polaritics.base.conexao import CAMINHO_BASE, CAMINHO_MODELO, anexar_modelo
 from polaritics.config import RAIZ
+from polaritics.medidas.ideologia.calculo import impressao, preparar
 from polaritics.medidas.ideologia.faixas import faixa
 from polaritics.validacao.criterios import Resultado, publicavel
 
@@ -79,7 +80,25 @@ def variantes_publicaveis(con: duckdb.DuckDBPyConnection, legislatura: int) -> l
     if min(linha[-1] for linha in linhas) < calculado:
         raise ErroPublicacao("a validação é anterior ao último cálculo do modelo; valide de novo")
     resultados = [Resultado(*linha[:-1]) for linha in linhas]
-    return [v for v in ("todas", "merito") if publicavel(resultados, v)]
+    variantes = [v for v in ("todas", "merito") if publicavel(resultados, v)]
+    conferir_impressao(con, legislatura, variantes)
+    return variantes
+
+
+def conferir_impressao(con: duckdb.DuckDBPyConnection, legislatura: int, variantes) -> None:
+    """Recusa publicar se os votos da base mudaram desde o cálculo do modelo."""
+    gravadas = dict(
+        con.execute(
+            "select variante, impressao from ideologia_diagnostico where legislatura = ?",
+            [legislatura],
+        ).fetchall()
+    )
+    for variante in variantes:
+        if gravadas.get(variante) != impressao(*preparar(con, legislatura, variante)):
+            raise ErroPublicacao(
+                f"os dados de votação mudaram desde o cálculo do modelo ({variante}); "
+                "rode `polaritics ideologia` e `polaritics validar` de novo"
+            )
 
 
 def _carregar(con: duckdb.DuckDBPyConnection, legislatura: int, variantes: list[str]) -> None:
@@ -248,13 +267,19 @@ def _carregar_mandato(con: duckdb.DuckDBPyConnection, legislatura: int) -> None:
     )
 
 
-def publicar(legislatura: int, base: Path = CAMINHO_BASE, url: str | None = None) -> list[str]:
+def publicar(
+    legislatura: int,
+    base: Path = CAMINHO_BASE,
+    url: str | None = None,
+    modelo: Path = CAMINHO_MODELO,
+) -> list[str]:
     """Publica as variantes aprovadas da legislatura. Devolve as variantes publicadas."""
     # Sessão em memória: a base local entra só para leitura e o Postgres para escrita (abrir a
     # base local em modo somente leitura estenderia esse modo ao Postgres anexado).
     with duckdb.connect() as con:
         con.execute("attach ? as local (read_only)", [str(base)])
         con.execute("use local")
+        anexar_modelo(con, "local", modelo, somente_leitura=True)
         variantes = variantes_publicaveis(con, legislatura)
         if not variantes:
             raise ErroPublicacao("nenhuma variante aprovada na validação; nada foi publicado")
