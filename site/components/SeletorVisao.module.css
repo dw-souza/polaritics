@@ -1,0 +1,55 @@
+.seletor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.grupo {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.grupo legend {
+  float: left;
+  margin-right: 8px;
+  font-size: 0.85rem;
+  color: var(--tinta-2);
+  font-weight: 600;
+}
+
+.opcao {
+  border: 1px solid var(--eixo);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.875rem;
+  color: var(--tinta);
+  text-decoration: none;
+  background: var(--superficie);
+}
+
+.opcao:hover,
+.opcao:focus-visible {
+  border-color: var(--tinta-2);
+}
+
+.opcao[aria-current="true"] {
+  background: var(--tinta);
+  border-color: var(--tinta);
+  color: var(--superficie);
+}
+
+.padrao {
+  opacity: 0.75;
+}
+
+.explicacao {
+  flex-basis: 100%;
+  margin: 0;
+}

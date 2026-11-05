@@ -15,3 +15,26 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest
+
+  site:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lockfile só com o registro público do npm
+        run: |
+          if grep -o '"resolved": "[^"]*"' package-lock.json | grep -v '"https://registry.npmjs.org/'; then
+            echo "package-lock.json tem URLs fora de registry.npmjs.org (registro privado/proxy local?)"
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci
+      - run: npx next typegen
+      - run: npx tsc --noEmit
+      - run: npm run lint

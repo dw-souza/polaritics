@@ -1,0 +1,90 @@
+.rotulo {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.campo {
+  width: 100%;
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--eixo);
+  border-radius: 8px;
+  background: var(--superficie);
+  color: var(--tinta);
+}
+
+.campo:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+}
+
+.contagem {
+  margin: 8px 0 12px;
+}
+
+.lista {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid var(--grade);
+}
+
+.item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "nome faixa"
+    "meta faixa";
+  gap: 0 16px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--grade);
+  color: var(--tinta);
+  text-decoration: none;
+}
+
+.item:hover,
+.item:focus-visible {
+  background: var(--superficie);
+}
+
+.nome {
+  grid-area: nome;
+  font-weight: 600;
+}
+
+.item > :nth-child(2) {
+  grid-area: meta;
+}
+
+.faixa {
+  grid-area: faixa;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.amostra {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+
+@media (max-width: 480px) {
+  .item {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "nome"
+      "meta"
+      "faixa";
+  }
+
+  .faixa {
+    text-align: left;
+    margin-top: 4px;
+  }
+}

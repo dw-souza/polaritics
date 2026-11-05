@@ -1,0 +1,245 @@
+.figura {
+  margin: 0;
+}
+
+/* Cada marcador ocupa uma linha própria, para não se sobreporem; as faixas formam o fundo. */
+.area {
+  position: relative;
+  padding-block: 6px 22px;
+  margin-inline: 8px;
+}
+
+.faixas {
+  position: absolute;
+  inset: 0;
+}
+
+.faixa {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-right: 2px solid var(--superficie);
+}
+
+.faixa:last-child {
+  border-right: 0;
+}
+
+/* fundo leve em toda a altura: só orienta o olho */
+.faixa::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--cor);
+  opacity: 0.16;
+}
+
+/* barra sólida na base: é ela que carrega a cor da faixa */
+.faixa::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 14px;
+  background: var(--cor);
+}
+
+.camada {
+  position: relative;
+  height: 34px;
+}
+
+.intervalo {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--tinta-2);
+  border-radius: 1px;
+}
+
+.intervalo::before,
+.intervalo::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  width: 2px;
+  height: 12px;
+  background: var(--tinta-2);
+}
+
+.intervalo::before {
+  left: 0;
+}
+
+.intervalo::after {
+  right: 0;
+}
+
+/* O alvo de clique/foco (24px) é maior que o desenho do marcador. */
+.marcador {
+  position: absolute;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: help;
+}
+
+.marcador::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  background: var(--tinta);
+  box-shadow: 0 0 0 2px var(--superficie);
+}
+
+.ponto::before {
+  border-radius: 50%;
+}
+
+.losango::before {
+  transform: rotate(45deg) scale(0.85);
+}
+
+.anel::before {
+  border-radius: 50%;
+  background: var(--superficie);
+  border: 3px solid var(--tinta);
+}
+
+.destaque::before {
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+}
+
+.marcador:hover::before,
+.marcador:focus-visible::before {
+  box-shadow: 0 0 0 2px var(--superficie), 0 0 0 4px var(--destaque);
+}
+
+.marcador:focus-visible {
+  outline: none;
+}
+
+.dica {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--superficie);
+  color: var(--tinta);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms;
+  z-index: 2;
+  text-align: left;
+}
+
+.marcador:hover .dica,
+.marcador:focus-visible .dica {
+  opacity: 1;
+}
+
+.dicaRotulo {
+  display: block;
+  color: var(--tinta-2);
+  font-size: 0.8rem;
+}
+
+.eixo {
+  position: relative;
+  height: 18px;
+  margin-inline: 8px;
+  color: var(--tinta-3);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.eixo span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.extremos {
+  display: flex;
+  justify-content: space-between;
+  color: var(--tinta-2);
+  font-size: 0.8rem;
+  margin: 2px 0 12px;
+}
+
+.legenda {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.legenda li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chave {
+  position: relative;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  align-self: center;
+}
+
+.chave::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--tinta);
+}
+
+.chave.anel::before {
+  background: transparent;
+  border: 2px solid var(--tinta);
+}
+
+.legendaFaixas {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 0.85rem;
+}
+
+.legendaFaixas li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.amostra {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex: none;
+}

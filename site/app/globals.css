@@ -1,0 +1,190 @@
+/* Tokens do Polaritics. Escala política: roxo (esquerda) ↔ cinza (centro) ↔ laranja (direita),
+   cores sem associação partidária no Brasil. Os tons foram gerados em OKLCH a partir da paleta
+   de referência e validados como rampas ordinais nos dois temas. */
+
+:root {
+  color-scheme: light;
+  --superficie: #fcfcfb;
+  --plano: #f9f9f7;
+  --tinta: #0b0b0b;
+  --tinta-2: #52514e;
+  --tinta-3: #6f6d68;
+  --grade: #e1e0d9;
+  --eixo: #c3c2b7;
+  --borda: rgba(11, 11, 11, 0.1);
+  --destaque: #2a78d6;
+  --aviso-fundo: #fff4e0;
+  --aviso-borda: #f0c36d;
+
+  --faixa-1: #5347b0;
+  --faixa-2: #766fdb;
+  --faixa-3: #a09eff;
+  --faixa-4: #c3c2b7;
+  --faixa-5: #fd8456;
+  --faixa-6: #cc5728;
+  --faixa-7: #9a3503;
+
+  --raio: 10px;
+  --fonte: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --superficie: #1a1a19;
+    --plano: #0d0d0d;
+    --tinta: #f0efec;
+    --tinta-2: #c3c2b7;
+    --tinta-3: #a3a198;
+    --grade: #2c2c2a;
+    --eixo: #383835;
+    --borda: rgba(255, 255, 255, 0.1);
+    --destaque: #3987e5;
+    --aviso-fundo: #2b2414;
+    --aviso-borda: #8a6a1f;
+    --faixa-1: #a09eff;
+    --faixa-2: #7972df;
+    --faixa-3: #584db6;
+    --faixa-4: #52514e;
+    --faixa-5: #a33800;
+    --faixa-6: #cf5a2c;
+    --faixa-7: #fd8456;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --superficie: #1a1a19;
+  --plano: #0d0d0d;
+  --tinta: #f0efec;
+  --tinta-2: #c3c2b7;
+  --tinta-3: #a3a198;
+  --grade: #2c2c2a;
+  --eixo: #383835;
+  --borda: rgba(255, 255, 255, 0.1);
+  --destaque: #3987e5;
+  --aviso-fundo: #2b2414;
+  --aviso-borda: #8a6a1f;
+  --faixa-1: #a09eff;
+  --faixa-2: #7972df;
+  --faixa-3: #584db6;
+  --faixa-4: #52514e;
+  --faixa-5: #a33800;
+  --faixa-6: #cf5a2c;
+  --faixa-7: #fd8456;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--plano);
+  color: var(--tinta);
+  font-family: var(--fonte);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--destaque);
+  text-underline-offset: 2px;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0 0 0.5em;
+}
+
+h1 {
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+}
+
+h2 {
+  font-size: 1.25rem;
+}
+
+p {
+  margin: 0 0 1em;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding-inline: 16px;
+}
+
+.cartao {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.secundario {
+  color: var(--tinta-2);
+}
+
+.pequeno {
+  font-size: 0.875rem;
+}
+
+.aviso {
+  background: var(--aviso-fundo);
+  border: 1px solid var(--aviso-borda);
+  border-radius: var(--raio);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.numeros {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.tabela-rolagem {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--grade);
+  vertical-align: top;
+}
+
+th {
+  color: var(--tinta-2);
+  font-weight: 600;
+}
+
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,144 @@
+.seletor {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+
+.seletor a {
+  border: 1px solid var(--eixo);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.875rem;
+  color: var(--tinta);
+  text-decoration: none;
+  background: var(--superficie);
+}
+
+.seletor a[aria-current="true"] {
+  background: var(--tinta);
+  border-color: var(--tinta);
+  color: var(--superficie);
+}
+
+.legenda {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  font-size: 0.9rem;
+}
+
+.legenda li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grafico {
+  margin-bottom: 16px;
+}
+
+.linha {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.sigla {
+  font-size: 0.85rem;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trilho {
+  position: relative;
+  height: 26px;
+  margin-inline: 8px;
+}
+
+.fundo {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-right: 2px solid var(--superficie);
+}
+
+.fundo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--cor);
+  opacity: 0.16;
+}
+
+.ligacao {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--tinta-2);
+}
+
+.ponto {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  box-shadow: 0 0 0 2px var(--superficie);
+}
+
+.ponto.esp {
+  background: var(--tinta);
+  transform: rotate(45deg) scale(0.85);
+}
+
+.ponto.voto {
+  border-radius: 50%;
+  background: var(--superficie);
+  border: 3px solid var(--tinta);
+}
+
+.chave {
+  position: relative;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+}
+
+.chave.esp {
+  background: var(--tinta);
+  transform: rotate(45deg) scale(0.85);
+}
+
+.chave.voto {
+  border-radius: 50%;
+  border: 3px solid var(--tinta);
+}
+
+.eixo {
+  position: relative;
+  height: 20px;
+  margin-inline: 8px;
+  color: var(--tinta-3);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.eixo span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 480px) {
+  .linha {
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    gap: 6px;
+  }
+}

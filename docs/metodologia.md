@@ -16,6 +16,8 @@ Permitir que o eleitor compare **o que o parlamentar diz ser** (o partido e o es
 5. **Escala fixa, não relativa:** as faixas ("mais à esquerda" … "mais à direita") têm cortes fixos. Ninguém cai numa faixa da ponta só por estar na ponta do ranking.
 6. **Três medidas separadas, nunca fundidas:** posição ideológica estimada, classificação do partido e governismo são números distintos e exibidos lado a lado (seção 5).
 7. **Reprodutibilidade:** código, dados brutos congelados e parâmetros públicos; qualquer pessoa deve conseguir reproduzir os números.
+   - **Limite do MCMC:** com a mesma semente, o modelo não dá resultados idênticos bit a bit em máquinas diferentes. A ordem dos cálculos em ponto flutuante, o processador e as cadeias em paralelo ou em sequência alteram as amostras. Na primeira execução no GitHub Actions (05/11/2026), o Spearman da variante só mérito deu 0,923, contra 0,914 na execução local, e 84 deputados mudaram de faixa entre as variantes, contra 83. São diferenças de ruído de Monte Carlo, bem longe dos limites dos critérios.
+   - **Como reproduzir uma publicação exatamente:** cada execução automática guarda por 90 dias, como artefato, o relatório de validação e o manifesto dos dados (com o hash SHA-256 de cada arquivo). A tabela `publicado.publicacao` registra a versão da metodologia e a data dos dados. Para auditar uma publicação, use o artefato da execução correspondente. Recalcular reproduz as conclusões, não necessariamente cada casa decimal.
 
 ## 1. Fontes
 

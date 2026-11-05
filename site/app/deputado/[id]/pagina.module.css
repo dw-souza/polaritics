@@ -1,0 +1,84 @@
+.cabecalho {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  margin-bottom: 24px;
+}
+
+.cabecalho h1 {
+  margin-bottom: 4px;
+}
+
+.cabecalho p {
+  margin: 0;
+}
+
+.foto {
+  border-radius: var(--raio);
+  object-fit: cover;
+  background: var(--grade);
+  flex: none;
+}
+
+.resumo {
+  font-size: 1.1rem;
+}
+
+.numeroGrande {
+  font-size: 3rem;
+  font-weight: 600;
+  line-height: 1;
+  margin: 0 0 8px;
+}
+
+.votacoes {
+  padding-left: 1.25em;
+  margin: 0;
+}
+
+.votacoes li {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--grade);
+}
+
+.votacoes li:last-child {
+  border-bottom: 0;
+}
+
+.votacoes p {
+  margin: 0 0 4px;
+}
+
+.votacaoTitulo {
+  font-weight: 600;
+}
+
+.ementa {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.etiqueta {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--eixo);
+  border-radius: 999px;
+  padding: 0 8px;
+  color: var(--tinta-2);
+}
+
+@media (max-width: 480px) {
+  .cabecalho {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.faixas {
+  margin: 14px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--grade);
+}
