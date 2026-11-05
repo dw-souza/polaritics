@@ -1,0 +1,21 @@
+.foto,
+.iniciais {
+  display: block;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--fio-forte);
+  background: var(--papel);
+}
+
+.foto {
+  object-fit: cover;
+  object-position: 50% 20%;
+}
+
+.iniciais {
+  display: grid;
+  place-items: center;
+  font-family: var(--f-dado);
+  font-weight: 700;
+  color: var(--tinta-2);
+}

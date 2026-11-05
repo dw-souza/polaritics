@@ -1,90 +1,120 @@
-.rotulo {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 6px;
+.abertura {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 28px 48px;
+  align-items: end;
+  padding-block: 8px 36px;
+  border-bottom: 1px solid var(--fio);
+}
+
+@media (max-width: 860px) {
+  .abertura {
+    grid-template-columns: 1fr;
+  }
+}
+
+.busca {
+  display: grid;
+  gap: 10px;
+}
+
+.busca label {
+  font: 600 15px var(--f-dado);
 }
 
 .campo {
   width: 100%;
-  font: inherit;
-  padding: 10px 12px;
-  border: 1px solid var(--eixo);
-  border-radius: 8px;
-  background: var(--superficie);
+  font: 500 18px var(--f-dado);
+  padding: 14px 16px;
+  border: 2px solid var(--tinta);
+  border-radius: 6px;
+  background: var(--folha);
   color: var(--tinta);
 }
 
-.campo:focus-visible {
-  outline: 2px solid var(--destaque);
-  outline-offset: 1px;
+.ufs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.contagem {
-  margin: 8px 0 12px;
+.ufs button {
+  font: 600 13px var(--f-dado);
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--fio-forte);
+  background: var(--folha);
+  color: var(--tinta-2);
+  cursor: pointer;
 }
 
-.lista {
+.ufs button:hover {
+  border-color: var(--tinta-3);
+}
+
+.ufs button[aria-pressed="true"] {
+  background: var(--acao);
+  color: var(--acao-texto);
+  border-color: var(--acao);
+}
+
+.grade {
   list-style: none;
   padding: 0;
   margin: 0;
-  border-top: 1px solid var(--grade);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
 }
 
-.item {
+.grade li {
+  display: flex;
+}
+
+.cartao {
+  flex: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "nome faixa"
-    "meta faixa";
-  gap: 0 16px;
-  padding: 10px 4px;
-  border-bottom: 1px solid var(--grade);
-  color: var(--tinta);
+  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  gap: 2px 12px;
+  padding: 14px;
+  background: var(--folha);
+  border: 1px solid var(--fio);
+  border-radius: 8px;
+  color: inherit;
   text-decoration: none;
 }
 
-.item:hover,
-.item:focus-visible {
-  background: var(--superficie);
+.cartao:hover {
+  border-color: var(--tinta-3);
+}
+
+.cartao > :first-child {
+  grid-row: span 2;
 }
 
 .nome {
-  grid-area: nome;
-  font-weight: 600;
+  font-family: var(--f-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
-.item > :nth-child(2) {
-  grid-area: meta;
+.meta {
+  font: 500 13px var(--f-dado);
+  color: var(--tinta-3);
 }
 
-.faixa {
-  grid-area: faixa;
-  align-self: center;
+.posicao {
+  grid-column: 1 / -1;
+  align-self: end;
+  margin-top: 12px;
+}
+
+.rodape {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.875rem;
-  text-align: right;
-}
-
-.amostra {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  flex: none;
-}
-
-@media (max-width: 480px) {
-  .item {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "nome"
-      "meta"
-      "faixa";
-  }
-
-  .faixa {
-    text-align: left;
-    margin-top: 4px;
-  }
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font: 600 13px var(--f-dado);
 }

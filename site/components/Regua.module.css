@@ -2,52 +2,53 @@
   margin: 0;
 }
 
-/* Cada marcador ocupa uma linha própria, para não se sobreporem; as faixas formam o fundo. */
 .area {
   position: relative;
-  padding-block: 6px 22px;
-  margin-inline: 8px;
+  padding: 0 8px;
 }
 
-.faixas {
+/* Fundo leve em toda a altura para orientar o olho; barra sólida na base carrega a cor. */
+.fundo {
   position: absolute;
-  inset: 0;
+  inset: 0 8px;
+  display: grid;
+  grid-template-columns: var(--colunas-faixas);
+  gap: 2px;
 }
 
-.faixa {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-right: 2px solid var(--superficie);
+.fundo i {
+  position: relative;
+  display: block;
 }
 
-.faixa:last-child {
-  border-right: 0;
-}
-
-/* fundo leve em toda a altura: só orienta o olho */
-.faixa::before {
+.fundo i::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--cor);
-  opacity: 0.16;
+  background: currentColor;
+  opacity: 0.13;
 }
 
-/* barra sólida na base: é ela que carrega a cor da faixa */
-.faixa::after {
+.fundo i::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 14px;
-  background: var(--cor);
+  height: 10px;
+  background: currentColor;
 }
 
-.camada {
+.linhas {
   position: relative;
-  height: 34px;
+  display: grid;
+  gap: 10px;
+  padding-block: 10px 18px;
+}
+
+.linha {
+  position: relative;
+  height: 28px;
 }
 
 .intervalo {
@@ -56,7 +57,6 @@
   height: 2px;
   margin-top: -1px;
   background: var(--tinta-2);
-  border-radius: 1px;
 }
 
 .intervalo::before,
@@ -77,13 +77,13 @@
   right: 0;
 }
 
-/* O alvo de clique/foco (24px) é maior que o desenho do marcador. */
+/* Alvo de 28px, maior que o desenho do marcador. */
 .marcador {
   position: absolute;
   top: 50%;
-  width: 24px;
-  height: 24px;
-  margin: -12px 0 0 -12px;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -95,36 +95,33 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 14px;
-  height: 14px;
-  margin: -7px 0 0 -7px;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
   background: var(--tinta);
-  box-shadow: 0 0 0 2px var(--superficie);
+  box-shadow: 0 0 0 2px var(--folha);
 }
 
-.ponto::before {
+.marcador.ponto::before {
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
   border-radius: 50%;
 }
 
-.losango::before {
-  transform: rotate(45deg) scale(0.85);
+.marcador.losango::before {
+  transform: rotate(45deg) scale(0.8);
 }
 
-.anel::before {
+.marcador.anel::before {
   border-radius: 50%;
-  background: var(--superficie);
+  background: var(--folha);
   border: 3px solid var(--tinta);
-}
-
-.destaque::before {
-  width: 18px;
-  height: 18px;
-  margin: -9px 0 0 -9px;
 }
 
 .marcador:hover::before,
 .marcador:focus-visible::before {
-  box-shadow: 0 0 0 2px var(--superficie), 0 0 0 4px var(--destaque);
+  box-shadow: 0 0 0 2px var(--folha), 0 0 0 4px var(--tinta-3);
 }
 
 .marcador:focus-visible {
@@ -133,22 +130,22 @@
 
 .dica {
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 4px);
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  background: var(--superficie);
+  background: var(--folha);
   color: var(--tinta);
-  border: 1px solid var(--borda);
-  border-radius: 8px;
+  border: 1px solid var(--fio-forte);
+  border-radius: 6px;
   padding: 6px 10px;
-  font-size: 0.85rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font: 500 14px var(--f-dado);
+  text-align: left;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
   pointer-events: none;
   opacity: 0;
   transition: opacity 120ms;
   z-index: 2;
-  text-align: left;
 }
 
 .marcador:hover .dica,
@@ -159,15 +156,15 @@
 .dicaRotulo {
   display: block;
   color: var(--tinta-2);
-  font-size: 0.8rem;
+  font-size: 13px;
 }
 
 .eixo {
   position: relative;
   height: 18px;
-  margin-inline: 8px;
+  margin: 4px 8px 0;
+  font: 500 12px var(--f-dado);
   color: var(--tinta-3);
-  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -176,49 +173,52 @@
   transform: translateX(-50%);
 }
 
-.extremos {
-  display: flex;
-  justify-content: space-between;
+.nomes {
+  display: grid;
+  grid-template-columns: var(--colunas-faixas);
+  gap: 2px;
+  margin: 6px 8px 0;
+  font: 600 11px var(--f-dado);
+  line-height: 1.2;
   color: var(--tinta-2);
-  font-size: 0.8rem;
-  margin: 2px 0 12px;
+  text-align: center;
 }
 
 .legenda {
   list-style: none;
   padding: 0;
-  margin: 0;
+  margin: 18px 0 0;
   display: grid;
-  gap: 6px;
-  font-size: 0.9rem;
+  gap: 8px;
+  font: 500 15px var(--f-dado);
 }
 
 .legenda li {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
   flex-wrap: wrap;
+  gap: 4px 10px;
 }
 
 .chave {
-  position: relative;
-  display: inline-block;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   flex: none;
-  align-self: center;
-}
-
-.chave::before {
-  content: "";
-  position: absolute;
-  inset: 0;
   background: var(--tinta);
 }
 
-.chave.anel::before {
+.chave.ponto {
+  border-radius: 50%;
+}
+
+.chave.losango {
+  transform: rotate(45deg) scale(0.8);
+}
+
+.chave.anel {
+  border-radius: 50%;
   background: transparent;
-  border: 2px solid var(--tinta);
+  border: 3px solid var(--tinta);
 }
 
 .legendaFaixas {
@@ -227,8 +227,8 @@
   margin: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 16px;
-  font-size: 0.85rem;
+  gap: 6px 18px;
+  font: 500 14px var(--f-dado);
 }
 
 .legendaFaixas li {
@@ -238,8 +238,14 @@
 }
 
 .amostra {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
   flex: none;
+}
+
+@media (max-width: 480px) {
+  .nomes {
+    font-size: 9px;
+  }
 }

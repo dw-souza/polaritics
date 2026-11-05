@@ -8,14 +8,16 @@ const DOC = "https://github.com/dw-souza/polaritics/blob/main/docs/metodologia.m
 
 export default function Metodologia() {
   return (
-    <div className="container">
+    <>
+      <section className="cabeca-pagina">
       <h1>Como funciona</h1>
-      <p className="secundario">
+      <p>
         Resumo em linguagem simples. A metodologia completa, com todas as decisões, testes e
         limitações, está no <a href={DOC}>documento público do projeto</a>.
       </p>
+      </section>
 
-      <section className="cartao">
+      <section className="secao leitura">
         <h2>De onde vêm os dados</h2>
         <p>
           Só de fontes oficiais: as <strong>votações nominais em plenário</strong> registradas
@@ -30,7 +32,7 @@ export default function Metodologia() {
         </p>
       </section>
 
-      <section className="cartao">
+      <section className="secao leitura">
         <h2>Como a posição é calculada</h2>
         <p>
           Um modelo estatístico (teoria de resposta ao item) olha para <strong>quem vota junto
@@ -44,13 +46,13 @@ export default function Metodologia() {
           os outros partidos e deputados aparecem onde os votos os colocam.
         </p>
         <LegendaFaixas />
-        <p className="pequeno secundario" style={{ marginTop: 12 }}>
+        <p className="pequeno discreto">
           As faixas têm cortes fixos. Ninguém é classificado nas pontas só por ser o mais à
           esquerda ou o mais à direita da Câmara.
         </p>
       </section>
 
-      <section className="cartao">
+      <section className="secao leitura">
         <h2>Incerteza e zona de fronteira</h2>
         <p>
           Toda posição tem um <strong>intervalo de 90%</strong>: a faixa onde o valor verdadeiro
@@ -63,7 +65,7 @@ export default function Metodologia() {
         </p>
       </section>
 
-      <section className="cartao">
+      <section className="secao leitura">
         <h2>As visões</h2>
         <p>
           <strong>Comportamento de voto</strong> (padrão): onde o deputado está pelos votos, e se
@@ -81,7 +83,7 @@ export default function Metodologia() {
         </p>
       </section>
 
-      <section className="cartao">
+      <section className="secao leitura">
         <h2>Governismo não é ideologia</h2>
         <p>
           O governismo mede quanto o deputado acompanha a orientação do governo do momento. O
@@ -92,7 +94,7 @@ export default function Metodologia() {
         </p>
       </section>
 
-      <section className="cartao">
+      <section className="secao leitura">
         <h2>O que este site não mede</h2>
         <ul>
           <li>Discursos, projetos apresentados e atuação fora do plenário.</li>
@@ -104,6 +106,6 @@ export default function Metodologia() {
           é aberto: <a href="https://github.com/dw-souza/polaritics">github.com/dw-souza/polaritics</a>.
         </p>
       </section>
-    </div>
+    </>
   );
 }

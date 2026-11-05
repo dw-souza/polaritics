@@ -17,39 +17,42 @@ export function SeletorVisao({
 }) {
   return (
     <div className={estilos.seletor}>
-      <fieldset className={estilos.grupo}>
-        <legend>Régua</legend>
-        {(Object.keys(REGUAS) as Regua[]).map((r) => (
-          <Link
-            key={r}
-            href={hrefVisao(base, r, votacoes)}
-            className={estilos.opcao}
-            aria-current={r === regua ? "true" : undefined}
-            scroll={false}
-          >
-            {REGUAS[r].nome}
-            {r === "voto" && <span className={estilos.padrao}> (padrão)</span>}
-          </Link>
-        ))}
-      </fieldset>
-      <fieldset className={estilos.grupo}>
-        <legend>Votações</legend>
-        {(Object.keys(VOTACOES) as Votacoes[]).map((v) => (
-          <Link
-            key={v}
-            href={hrefVisao(base, regua, v)}
-            className={estilos.opcao}
-            aria-current={v === votacoes ? "true" : undefined}
-            scroll={false}
-          >
-            {VOTACOES[v].nome}
-            {v === "todas" && <span className={estilos.padrao}> (padrão)</span>}
-          </Link>
-        ))}
-      </fieldset>
-      <p className={`secundario pequeno ${estilos.explicacao}`}>
-        <strong>{REGUAS[regua].nome}:</strong> {REGUAS[regua].pergunta}{" "}
-        <strong>{VOTACOES[votacoes].nome}:</strong> {VOTACOES[votacoes].explicacao}
+      <div className={estilos.grupos}>
+        <nav className="seg" aria-label="Régua">
+          {(Object.keys(REGUAS) as Regua[]).map((r) => (
+            <Link
+              key={r}
+              href={hrefVisao(base, r, votacoes)}
+              aria-current={r === regua ? "true" : undefined}
+              scroll={false}
+            >
+              {REGUAS[r].nome}
+            </Link>
+          ))}
+        </nav>
+        <nav className="seg" aria-label="Votações">
+          {(Object.keys(VOTACOES) as Votacoes[]).map((v) => (
+            <Link
+              key={v}
+              href={hrefVisao(base, regua, v)}
+              aria-current={v === votacoes ? "true" : undefined}
+              scroll={false}
+            >
+              {VOTACOES[v].nome}
+            </Link>
+          ))}
+        </nav>
+      </div>
+      <p className={estilos.explicacao}>
+        {REGUAS[regua].pergunta} {VOTACOES[votacoes].explicacao}
+        {(regua !== "voto" || votacoes !== "todas") && (
+          <>
+            {" "}
+            <Link href={hrefVisao(base, "voto", "todas")} scroll={false}>
+              Voltar à visão padrão
+            </Link>
+          </>
+        )}
       </p>
     </div>
   );

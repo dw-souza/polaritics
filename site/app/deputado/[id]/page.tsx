@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { LegendaFaixas, Regua, type Marcador } from "@/components/Regua";
+import { Foto } from "@/components/Foto";
+import { Regua, type Marcador } from "@/components/Regua";
 import { SeletorVisao } from "@/components/SeletorVisao";
 import {
   deputado,
@@ -11,32 +12,46 @@ import {
   posicaoPartido,
   posicoes,
   publicacaoAtual,
+  rankingFidelidade,
+  rankingGovernismo,
   votacoesExplicativas,
+  type Governismo as LinhaGovernismo,
+  type LinhaRanking,
   type Posicao,
 } from "@/lib/dados";
 import {
   REGUAS,
+  UFS,
   VOTACOES,
+  cargo,
+  ementaAtual,
   faixa,
   formatarDataCurta,
   formatarNota,
   formatarPct,
+  fraseFaixa,
   lerVisao,
+  nomeCurtoGoverno,
 } from "@/lib/escala";
 
 import estilos from "./pagina.module.css";
 
 export default function PaginaDeputado(props: PageProps<"/deputado/[id]">) {
   return (
-    <div className="container">
-      <Suspense fallback={<p className="secundario">Carregando…</p>}>
-        <Conteudo {...props} />
-      </Suspense>
-    </div>
+    <Suspense fallback={<p className="discreto">Carregando a ficha…</p>}>
+      <Ficha {...props} />
+    </Suspense>
   );
 }
 
-async function Conteudo({ params, searchParams }: PageProps<"/deputado/[id]">) {
+// Posição no ranking (1 = maior valor), com empates dividindo a mesma posição.
+function colocacao(lista: LinhaRanking[], id: string) {
+  const eu = lista.find((l) => l.id_camara === id);
+  if (!eu) return null;
+  return { posicao: 1 + lista.filter((l) => l.valor > eu.valor).length, total: lista.length };
+}
+
+async function Ficha({ params, searchParams }: PageProps<"/deputado/[id]">) {
   const { id } = await params;
   const { regua, votacoes } = lerVisao(await searchParams);
   const pub = await publicacaoAtual();
@@ -44,95 +59,208 @@ async function Conteudo({ params, searchParams }: PageProps<"/deputado/[id]">) {
   const dep = await deputado(id, pub.legislatura);
   if (!dep) notFound();
 
-  const [todas, gov, fid, partido, explicativas] = await Promise.all([
+  const [todas, gov, fid, partido, explicativas, rkGov, rkFid] = await Promise.all([
     posicoes(id, pub.legislatura),
     governismo(id, pub.legislatura),
     fidelidade(id, pub.legislatura),
     dep.partido ? posicaoPartido(dep.partido, pub.legislatura) : null,
     votacoesExplicativas(id, pub.legislatura, votacoes),
+    rankingGovernismo(pub.legislatura),
+    rankingFidelidade(pub.legislatura),
   ]);
   const posicao = todas.find((p) => p.regua === regua && p.variante === votacoes);
-  const outraVariante = todas.find(
-    (p) => p.regua === "voto" && p.variante !== votacoes,
-  );
+  const padrao = todas.find((p) => p.regua === "voto" && p.variante === "todas");
   const principal = todas.find((p) => p.regua === "voto" && p.variante === votacoes);
+  const outra = todas.find((p) => p.regua === "voto" && p.variante !== votacoes);
+  const govGeral = gov.find((g) => g.periodo === "legislatura" && g.suficiente);
+  const fidGeral = fid.find((f) => f.periodo === "legislatura" && f.suficiente);
+  const esp = partido?.especialistas ?? null;
+  const bancada = partido?.votos.find((v) => v.variante === votacoes)?.nota_votos ?? null;
+  const bancadaPadrao = partido?.votos.find((v) => v.variante === "todas")?.nota_votos ?? null;
+  const posGov = colocacao(rkGov, id);
+  const posFid = colocacao(rkFid, id);
+  const ufNome = dep.uf ? (UFS[dep.uf] ?? dep.uf) : null;
 
   return (
     <article>
-      <header className={estilos.cabecalho}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- foto oficial da Câmara */}
-        <img src={dep.foto_url} alt="" className={estilos.foto} width={88} height={116} />
+      <p className={estilos.migalha}>
+        <Link href="/">← Todos os deputados</Link>
+      </p>
+      <header className={estilos.identidade}>
+        <Foto url={dep.foto_url} nome={dep.nome} tamanho={104} />
         <div>
-          <p className="secundario pequeno">
-            <Link href="/">← Deputados</Link>
-          </p>
           <h1>{dep.nome}</h1>
-          <p className="secundario">
-            Deputado(a) federal · {[dep.partido, dep.uf].filter(Boolean).join(" · ")} ·{" "}
-            {pub.legislatura}ª legislatura
+          <p className={estilos.cargo}>
+            {[cargo(dep.sexo), dep.partido, ufNome, `${pub.legislatura}ª legislatura`]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
       </header>
 
-      <section className="cartao">
-        <h2>Posição na escala política</h2>
+      <Manchete posicao={padrao} partido={dep.partido} bancada={bancadaPadrao} gov={govGeral} />
+
+      <section className={estilos.blocos} aria-label="Resumo">
+        <div className={estilos.bloco}>
+          <span className="rotulo">Posição pelos votos</span>
+          {padrao ? (
+            <>
+              <span className={`${estilos.valor} num`}>
+                {formatarNota(padrao.nota)} <small>{padrao.faixa_exibida.toLowerCase()}</small>
+              </span>
+              <span className={estilos.pos}>
+                Entre {formatarNota(padrao.nota_p05)} e {formatarNota(padrao.nota_p95)}{" "}
+                <span>(90% de certeza)</span>
+              </span>
+            </>
+          ) : (
+            <span className={estilos.semDado}>Votos insuficientes</span>
+          )}
+          <details>
+            <summary>O que é</summary>
+            Posição na escala de 0 (mais à esquerda) a 10 (mais à direita), estimada a partir das
+            votações nominais em plenário.
+          </details>
+        </div>
+        <div className={estilos.bloco}>
+          <span className="rotulo">Governismo</span>
+          {govGeral && govGeral.taxa_disputadas !== null ? (
+            <>
+              <span className={`${estilos.valor} num`}>
+                {formatarPct(govGeral.taxa_disputadas)}
+              </span>
+              <span className={estilos.pos}>
+                {posGov && `${posGov.posicao}º mais governista `}
+                <span>
+                  {posGov && `de ${posGov.total} · `}
+                  {govGeral.n_disputadas} votações disputadas
+                </span>
+              </span>
+            </>
+          ) : (
+            <span className={estilos.semDado}>Votos insuficientes</span>
+          )}
+          <details>
+            <summary>O que é</summary>
+            Percentual de votos iguais à orientação do governo quando governo e oposição pediram
+            votos diferentes. Mede apoio ao governo do momento, não ideologia.
+          </details>
+        </div>
+        <div className={estilos.bloco}>
+          <span className="rotulo">Fidelidade ao partido</span>
+          {fidGeral && fidGeral.taxa !== null ? (
+            <>
+              <span className={`${estilos.valor} num`}>{formatarPct(fidGeral.taxa)}</span>
+              <span className={estilos.pos}>
+                {posFid && `${posFid.posicao}º mais fiel `}
+                <span>
+                  {posFid && `de ${posFid.total} · `}
+                  {fidGeral.n} votações
+                </span>
+              </span>
+            </>
+          ) : (
+            <span className={estilos.semDado}>Votos insuficientes</span>
+          )}
+          <details>
+            <summary>O que é</summary>
+            Percentual de votos iguais ao da maioria da própria bancada, considerando o partido
+            na data de cada voto.
+          </details>
+        </div>
+      </section>
+
+      <section className="secao">
+        <div className="secao-cab">
+          <h2>Onde {dep.sexo === "F" ? "ela" : "ele"} está na régua</h2>
+        </div>
         <SeletorVisao base={`/deputado/${id}`} regua={regua} votacoes={votacoes} />
         {posicao ? (
-          <Posicionamento
-            nome={dep.nome}
-            posicao={posicao}
-            principal={principal}
-            outraVariante={outraVariante}
-            partido={dep.partido}
-            dadosPartido={partido}
-          />
+          <div className={estilos.regua}>
+            {posicao.fronteira && (
+              <p className="aviso">
+                <strong>Zona de fronteira.</strong> A nota fica muito perto do limite entre duas
+                faixas: pequenas mudanças nas votações consideradas trocam o rótulo. Por isso
+                mostramos as duas.
+              </p>
+            )}
+            <Regua
+              titulo={`Posição de ${dep.nome} na escala de 0 a 10`}
+              marcadores={marcadoresDe(dep.nome, posicao, dep.partido, esp, bancada)}
+            />
+            <Comparacao
+              nome={dep.nome}
+              posicao={posicao}
+              partido={dep.partido}
+              esp={esp}
+              bancada={bancada}
+            />
+            {principal && outra && principal.faixa_exibida !== outra.faixa_exibida && (
+              <p className="pequeno discreto">
+                A faixa depende das votações consideradas:{" "}
+                {VOTACOES[principal.variante].nome.toLowerCase()} →{" "}
+                {principal.faixa_exibida.toLowerCase()};{" "}
+                {VOTACOES[outra.variante].nome.toLowerCase()} → {outra.faixa_exibida.toLowerCase()}.
+              </p>
+            )}
+            <p className="pequeno discreto">
+              Baseado em {posicao.n_votos} votos nominais em plenário · {REGUAS[posicao.regua].nome}{" "}
+              · {VOTACOES[posicao.variante].nome} ·{" "}
+              <Link href="/metodologia">como é calculado</Link>
+            </p>
+          </div>
         ) : (
-          <DadosInsuficientes />
+          <p className="aviso">
+            <strong>Votos insuficientes.</strong> {dep.nome} votou em menos de 10% das votações
+            consideradas. Isso acontece com suplentes que exerceram pouco tempo, com quem ficou
+            licenciado (por exemplo, para assumir um ministério ou secretaria) e com o presidente
+            da Câmara, que normalmente não vota.
+          </p>
         )}
       </section>
 
-      <section className="cartao">
-        <h2>Governismo</h2>
-        <Governismo linhas={gov} />
-      </section>
-
-      <section className="cartao">
-        <h2>Fidelidade ao partido</h2>
-        <Fidelidade linhas={fid} partido={dep.partido} />
-      </section>
+      {govGeral && <GovernismoPorAno linhas={gov} />}
 
       {posicao && explicativas.length > 0 && (
-        <section className="cartao">
-          <h2>Votações que mais pesaram na posição</h2>
-          <p className="secundario pequeno">
-            Os votos que mais empurraram {dep.nome} para o lado em que está, considerando{" "}
-            {VOTACOES[votacoes].nome.toLowerCase()}. Um item por projeto.
-          </p>
-          <ol className={estilos.votacoes}>
+        <section className="secao">
+          <div className="secao-cab">
+            <h2>Votações que mais pesaram</h2>
+            <span className="rotulo">Um item por projeto · {VOTACOES[votacoes].nome}</span>
+          </div>
+          <ol className={estilos.votos}>
             {explicativas.map((v) => (
               <li key={v.id_votacao}>
-                <p className={estilos.votacaoTitulo}>
-                  {v.proposicao && v.url_proposicao ? (
-                    <a href={v.url_proposicao}>{v.proposicao}</a>
-                  ) : (
-                    "Votação"
-                  )}{" "}
-                  <span className={estilos.etiqueta}>
+                <div>
+                  <div className={estilos.pl}>
+                    {v.proposicao && v.url_proposicao ? (
+                      <a href={v.url_proposicao}>{v.proposicao}</a>
+                    ) : (
+                      "Votação"
+                    )}
+                  </div>
+                  <div className={estilos.data}>
+                    {formatarDataCurta(v.data)} ·{" "}
                     {v.tipo === "procedimento" ? "andamento da pauta" : "mérito"}
-                  </span>{" "}
-                  <span className="secundario pequeno numeros">{formatarDataCurta(v.data)}</span>
-                </p>
-                {v.ementa && <p className={estilos.ementa}>{v.ementa}</p>}
-                <p className="secundario pequeno">
-                  O que foi votado: {v.descricao.replace(/\s*Sim:[\s\S]*$/i, "").trim() || v.descricao}
-                </p>
-                <p className="pequeno">
-                  Voto: <strong>{v.voto ?? "—"}</strong>
-                  {v.orientacao_governo && (
-                    <span className="secundario"> · orientação do governo: {v.orientacao_governo}</span>
-                  )}{" "}
-                  · <a href={v.url}>registro oficial</a>
-                </p>
+                  </div>
+                </div>
+                <div className="leitura">
+                  {v.ementa && <p className={estilos.ementa}>{ementaAtual(v.ementa)}</p>}
+                  <p className="pequeno discreto">
+                    O que foi votado:{" "}
+                    {v.descricao.replace(/\s*Sim:[\s\S]*$/i, "").trim() || v.descricao}
+                  </p>
+                  <p className="pequeno">
+                    Votou <span className={estilos.voto}>{v.voto ?? "—"}</span>
+                    <span className="discreto">
+                      {" · "}
+                      {v.orientacao_governo
+                        ? `governo orientou ${v.orientacao_governo}`
+                        : "governo não orientou"}
+                      {" · "}
+                      <a href={v.url}>registro oficial</a>
+                    </span>
+                  </p>
+                </div>
               </li>
             ))}
           </ol>
@@ -142,91 +270,75 @@ async function Conteudo({ params, searchParams }: PageProps<"/deputado/[id]">) {
   );
 }
 
-function Posicionamento({
-  nome,
+function Manchete({
   posicao,
-  principal,
-  outraVariante,
   partido,
-  dadosPartido,
+  bancada,
+  gov,
 }: {
-  nome: string;
-  posicao: Posicao;
-  principal: Posicao | undefined;
-  outraVariante: Posicao | undefined;
+  posicao: Posicao | undefined;
   partido: string | null;
-  dadosPartido: Awaited<ReturnType<typeof posicaoPartido>> | null;
+  bancada: number | null;
+  gov: LinhaGovernismo | undefined;
 }) {
-  const esp = dadosPartido?.especialistas ?? null;
-  const votosPartido = dadosPartido?.votos.find((v) => v.variante === posicao.variante);
-  const marcadores: Marcador[] = [
+  if (!posicao && !gov) return null;
+  const f = posicao ? fraseFaixa(posicao.faixa_exibida, posicao.fronteira) : null;
+  let relacao = "";
+  if (posicao && partido && bancada !== null) {
+    relacao =
+      bancada < posicao.nota_p05
+        ? `, mais à direita que a bancada do ${partido}`
+        : bancada > posicao.nota_p95
+          ? `, mais à esquerda que a bancada do ${partido}`
+          : `, em linha com o ${partido}`;
+  }
+  return (
+    <p className={estilos.manchete}>
+      {f && (
+        <>
+          {f.antes} <span className="marca">{f.destaque}</span>
+          {relacao}
+        </>
+      )}
+      {gov && gov.taxa_disputadas !== null && (
+        <>
+          {f ? ", e acompanha" : "Acompanha"} o governo {nomeCurtoGoverno(gov.governo)} em{" "}
+          <span className="marca">{formatarPct(gov.taxa_disputadas)}</span> das votações em que
+          governo e oposição discordaram
+        </>
+      )}
+      .
+    </p>
+  );
+}
+
+function marcadoresDe(
+  nome: string,
+  posicao: Posicao,
+  partido: string | null,
+  esp: number | null,
+  bancada: number | null,
+): Marcador[] {
+  const m: Marcador[] = [
     {
       rotulo: nome,
       nota: posicao.nota,
       intervalo: [posicao.nota_p05, posicao.nota_p95],
       forma: "ponto",
-      destaque: true,
     },
   ];
   if (partido && esp !== null) {
-    marcadores.push({ rotulo: `${partido} segundo especialistas`, nota: esp, forma: "losango" });
-  }
-  if (partido && votosPartido && posicao.regua === "voto") {
-    marcadores.push({
-      rotulo: `${partido} pelos votos (mediana da bancada)`,
-      nota: votosPartido.nota_votos,
-      forma: "anel",
+    m.push({
+      rotulo: `${partido} segundo especialistas`,
+      nota: esp,
+      forma: "losango",
+      detalhe: faixa(esp).toLowerCase(),
     });
   }
-
-  return (
-    <>
-      <p className={estilos.resumo}>
-        {posicao.regua === "voto" ? "Pelos votos, " : "Comparado ao próprio partido, "}
-        {nome} está{" "}
-        {posicao.fronteira ? (
-          <>
-            entre as faixas{" "}
-            <strong>{posicao.faixa_exibida.replace(/^Entre /, "")}</strong>
-          </>
-        ) : (
-          <>
-            na faixa <strong>{posicao.faixa_exibida}</strong>
-          </>
-        )}{" "}
-        <span className="numeros">({formatarNota(posicao.nota)})</span>.
-      </p>
-      {posicao.fronteira && (
-        <p className="aviso pequeno">
-          <strong>Zona de fronteira.</strong> A nota fica muito perto do limite entre duas faixas:
-          pequenas mudanças nas votações consideradas trocam o rótulo. Por isso mostramos as duas.
-        </p>
-      )}
-      <Regua marcadores={marcadores} titulo={`Posição de ${nome} na escala de 0 a 10`} />
-      <div className={estilos.faixas}>
-        <LegendaFaixas />
-      </div>
-      <Comparacao
-        nome={nome}
-        posicao={posicao}
-        partido={partido}
-        esp={esp}
-        votosPartido={votosPartido?.nota_votos ?? null}
-      />
-      {principal && outraVariante && principal.faixa_exibida !== outraVariante.faixa_exibida && (
-        <p className="secundario pequeno">
-          A faixa depende das votações consideradas: {VOTACOES[principal.variante].nome.toLowerCase()}{" "}
-          → {principal.faixa_exibida.toLowerCase()};{" "}
-          {VOTACOES[outraVariante.variante].nome.toLowerCase()} →{" "}
-          {outraVariante.faixa_exibida.toLowerCase()}.
-        </p>
-      )}
-      <p className="secundario pequeno">
-        Baseado em {posicao.n_votos} votos nominais em plenário. Visão: {REGUAS[posicao.regua].nome}{" "}
-        · {VOTACOES[posicao.variante].nome}. <Link href="/metodologia">Como é calculado</Link>
-      </p>
-    </>
-  );
+  if (partido && bancada !== null && posicao.regua === "voto") {
+    m.push({ rotulo: `Bancada do ${partido} pelos votos`, nota: bancada, forma: "anel" });
+  }
+  return m;
 }
 
 function Comparacao({
@@ -234,18 +346,18 @@ function Comparacao({
   posicao,
   partido,
   esp,
-  votosPartido,
+  bancada,
 }: {
   nome: string;
   posicao: Posicao;
   partido: string | null;
   esp: number | null;
-  votosPartido: number | null;
+  bancada: number | null;
 }) {
   if (!partido) return null;
   if (esp === null) {
     return (
-      <p>
+      <p className="leitura">
         O partido {partido} não tem classificação de especialistas (foi criado ou fundido depois
         do levantamento), então só a posição pelos votos é mostrada.
       </p>
@@ -260,101 +372,50 @@ function Comparacao({
         : "em linha com";
   if (posicao.regua === "campo") {
     return (
-      <p>
+      <p className="leitura">
         Especialistas classificam o {partido} como {faixa(esp).toLowerCase()} (
-        {formatarNota(esp)}). {nome} vota {lado(esp)} o partido.
+        {formatarNota(esp)}). Comparado a essa referência, {nome} vota {lado(esp)} o partido.
       </p>
     );
   }
   return (
-    <p>
+    <p className="leitura">
       Especialistas classificam o {partido} como <strong>{faixa(esp).toLowerCase()}</strong> (
       {formatarNota(esp)}).
-      {votosPartido !== null && (
+      {bancada !== null && (
         <>
           {" "}
-          Pelos votos, a bancada do partido fica em{" "}
-          <strong>{faixa(votosPartido).toLowerCase()}</strong> ({formatarNota(votosPartido)}), e{" "}
-          {nome} vota {lado(votosPartido)} a bancada.
+          Pelos votos, a bancada fica em <strong>{faixa(bancada).toLowerCase()}</strong> (
+          {formatarNota(bancada)}), e {nome} vota {lado(bancada)} ela.
         </>
       )}
     </p>
   );
 }
 
-function DadosInsuficientes() {
-  return (
-    <p className="aviso">
-      <strong>Dados insuficientes.</strong> Este parlamentar votou em menos de 10% das votações
-      consideradas. Isso acontece com suplentes que exerceram pouco tempo, com quem ficou
-      licenciado (por exemplo, para assumir um ministério ou secretaria) e com o presidente da
-      Câmara, que normalmente não vota.
-    </p>
-  );
-}
-
-function Governismo({ linhas }: { linhas: Awaited<ReturnType<typeof governismo>> }) {
-  const geral = linhas.find((l) => l.periodo === "legislatura");
-  if (!geral || !geral.suficiente || geral.taxa_disputadas === null) {
-    return <p className="secundario">Dados insuficientes para calcular o governismo.</p>;
-  }
+function GovernismoPorAno({ linhas }: { linhas: LinhaGovernismo[] }) {
   const anos = linhas.filter((l) => l.periodo !== "legislatura" && l.taxa_disputadas !== null);
+  if (anos.length < 2) return null;
   return (
-    <>
-      <p className={estilos.numeroGrande}>{formatarPct(geral.taxa_disputadas)}</p>
-      <p>
-        dos votos acompanharam a orientação do governo ({geral.governo}) nas{" "}
-        <strong>{geral.n_disputadas} votações em que governo e oposição discordaram</strong>.
-        Considerando todas as votações em que o governo orientou, foram{" "}
-        {formatarPct(geral.taxa_total ?? 0)} ({geral.n_total}).
-      </p>
-      <p className="secundario pequeno">
-        Governismo não é ideologia: mede o apoio ao governo do momento. Votações de consenso
-        (quando governo e oposição pedem o mesmo voto) ficam de fora do número principal.
-      </p>
-      {anos.length > 1 && (
-        <div className="tabela-rolagem">
-          <table>
-            <caption className="sr-only">Governismo por ano</caption>
-            <thead>
-              <tr>
-                <th>Ano</th>
-                <th className="num">Votações disputadas</th>
-                <th className="num">Com o governo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {anos.map((a) => (
-                <tr key={a.periodo}>
-                  <td>{a.periodo}</td>
-                  <td className="num">{a.n_disputadas}</td>
-                  <td className="num">{formatarPct(a.taxa_disputadas ?? 0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </>
-  );
-}
-
-function Fidelidade({
-  linhas,
-  partido,
-}: {
-  linhas: Awaited<ReturnType<typeof fidelidade>>;
-  partido: string | null;
-}) {
-  const geral = linhas.find((l) => l.periodo === "legislatura");
-  if (!geral || !geral.suficiente || geral.taxa === null) {
-    return <p className="secundario">Dados insuficientes para calcular a fidelidade.</p>;
-  }
-  return (
-    <p>
-      Votou igual à maioria da própria bancada em <strong>{formatarPct(geral.taxa)}</strong> das{" "}
-      {geral.n} votações comparáveis
-      {partido ? ` (partido na data de cada voto; hoje ${partido})` : ""}.
-    </p>
+    <section className="secao">
+      <div className="secao-cab">
+        <h2>Governismo ano a ano</h2>
+        <span className="rotulo">Votações em que governo e oposição discordaram</span>
+      </div>
+      <ul className={estilos.anos}>
+        {anos.map((a) => (
+          <li key={a.periodo}>
+            <span className="num">{a.periodo}</span>
+            <span className={estilos.trilho} aria-hidden="true">
+              <i style={{ width: `${(a.taxa_disputadas ?? 0) * 100}%` }} />
+            </span>
+            <span className="num">
+              <strong>{formatarPct(a.taxa_disputadas ?? 0)}</strong>{" "}
+              <span className="discreto">de {a.n_disputadas}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

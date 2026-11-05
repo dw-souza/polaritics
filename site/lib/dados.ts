@@ -16,9 +16,11 @@ export type Publicacao = {
 export type DeputadoResumo = {
   id_camara: string;
   nome: string;
+  foto_url: string;
   partido: string | null;
   uf: string | null;
   faixa_exibida: string | null;
+  fronteira: boolean | null;
   nota: number | null;
 };
 
@@ -26,9 +28,29 @@ export type Deputado = {
   id_camara: string;
   nome: string;
   nome_civil: string | null;
+  sexo: string | null;
   foto_url: string;
   partido: string | null;
   uf: string | null;
+};
+
+export type Fatos = {
+  direita_especialistas: number | null;
+  direita_votos: number | null;
+  partidos_direita: string[];
+  governismo_mediano: number | null;
+  em_fronteira: number;
+  com_posicao: number;
+};
+
+export type LinhaRanking = {
+  id_camara: string;
+  nome: string;
+  foto_url: string;
+  partido: string | null;
+  uf: string | null;
+  valor: number;
+  n: number;
 };
 
 export type Posicao = {
@@ -98,7 +120,8 @@ export async function listaDeputados(legislatura: number): Promise<DeputadoResum
   cacheLife("hours");
   cacheTag("publicacao");
   return (await sql`
-    select d.id_camara, d.nome, m.partido_atual as partido, m.uf, p.faixa_exibida, p.nota
+    select d.id_camara, d.nome, d.foto_url, m.partido_atual as partido, m.uf, p.faixa_exibida,
+           p.fronteira, p.nota
     from publicado.mandato m
     join publicado.deputado d using (id_camara)
     left join publicado.posicao p on p.id_camara = m.id_camara and p.legislatura = m.legislatura
@@ -112,7 +135,7 @@ export async function deputado(id: string, legislatura: number): Promise<Deputad
   cacheLife("hours");
   cacheTag("publicacao");
   const linhas = await sql`
-    select d.id_camara, d.nome, d.nome_civil, d.foto_url, m.partido_atual as partido, m.uf
+    select d.id_camara, d.nome, d.nome_civil, d.sexo, d.foto_url, m.partido_atual as partido, m.uf
     from publicado.deputado d
     join publicado.mandato m on m.id_camara = d.id_camara and m.legislatura = ${legislatura}
     where d.id_camara = ${id}`;
@@ -199,4 +222,63 @@ export async function partidos(legislatura: number, variante: Votacoes): Promise
     from publicado.posicao_partido pp
     where pp.legislatura = ${legislatura} and pp.variante = ${variante}
     order by pp.nota_votos`) as PartidoLinha[];
+}
+
+// Fatos da página inicial, calculados dos dados publicados (nada escrito à mão).
+export async function fatos(legislatura: number): Promise<Fatos> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("publicacao");
+  const [direita] = await sql`
+    select percentile_cont(0.5) within group (order by nota_especialistas) as especialistas,
+           percentile_cont(0.5) within group (order by nota_votos) as votos,
+           array_agg(partido order by n_deputados desc) as partidos
+    from publicado.posicao_partido
+    where legislatura = ${legislatura} and variante = 'todas'
+      and nota_especialistas > 7.0 and nota_especialistas <= 8.5`;
+  const [gov] = await sql`
+    select percentile_cont(0.5) within group (order by taxa_disputadas) as mediana
+    from publicado.governismo
+    where legislatura = ${legislatura} and periodo = 'legislatura' and suficiente`;
+  const [fr] = await sql`
+    select count(*) filter (where fronteira)::int as em_fronteira, count(*)::int as total
+    from publicado.posicao
+    where legislatura = ${legislatura} and variante = 'todas' and regua = 'voto'`;
+  return {
+    direita_especialistas: (direita?.especialistas as number | null) ?? null,
+    direita_votos: (direita?.votos as number | null) ?? null,
+    partidos_direita: (direita?.partidos as string[] | null) ?? [],
+    governismo_mediano: (gov?.mediana as number | null) ?? null,
+    em_fronteira: (fr?.em_fronteira as number) ?? 0,
+    com_posicao: (fr?.total as number) ?? 0,
+  };
+}
+
+// Rankings: só deputados com dados suficientes; a ordem e os filtros ficam na página.
+export async function rankingGovernismo(legislatura: number): Promise<LinhaRanking[]> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("publicacao");
+  return (await sql`
+    select d.id_camara, d.nome, d.foto_url, m.partido_atual as partido, m.uf,
+           g.taxa_disputadas as valor, g.n_disputadas as n
+    from publicado.governismo g
+    join publicado.deputado d using (id_camara)
+    join publicado.mandato m on m.id_camara = g.id_camara and m.legislatura = g.legislatura
+    where g.legislatura = ${legislatura} and g.periodo = 'legislatura' and g.suficiente
+    order by g.taxa_disputadas desc, d.nome`) as LinhaRanking[];
+}
+
+export async function rankingFidelidade(legislatura: number): Promise<LinhaRanking[]> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("publicacao");
+  return (await sql`
+    select d.id_camara, d.nome, d.foto_url, m.partido_atual as partido, m.uf,
+           f.taxa as valor, f.n
+    from publicado.fidelidade f
+    join publicado.deputado d using (id_camara)
+    join publicado.mandato m on m.id_camara = f.id_camara and m.legislatura = f.legislatura
+    where f.legislatura = ${legislatura} and f.periodo = 'legislatura' and f.suficiente
+    order by f.taxa desc, d.nome`) as LinhaRanking[];
 }

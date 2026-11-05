@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Archivo, Source_Serif_4 } from "next/font/google";
 import Link from "next/link";
 
 import { publicacaoAtual } from "@/lib/dados";
@@ -6,54 +7,73 @@ import { formatarData } from "@/lib/escala";
 import "./globals.css";
 import estilos from "./layout.module.css";
 
+const archivo = Archivo({
+  subsets: ["latin"],
+  axes: ["wdth"],
+  variable: "--fonte-archivo",
+  display: "swap",
+});
+const serif = Source_Serif_4({
+  subsets: ["latin"],
+  axes: ["opsz"],
+  style: ["normal", "italic"],
+  variable: "--fonte-serif",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: { default: "Polaritics", template: "%s · Polaritics" },
   description:
-    "Como os deputados federais votam e onde esse comportamento os coloca na escala política, com dados oficiais da Câmara.",
+    "Como cada deputado federal vota, o quanto acompanha o governo e onde fica na escala política. Só com dados oficiais da Câmara.",
 };
 
 async function Rodape() {
   const pub = await publicacaoAtual();
   return (
     <footer className={estilos.rodape}>
-      <div className="container">
-        <p>
-          Dados oficiais da Câmara dos Deputados (Dados Abertos).
-          {pub && (
-            <>
-              {" "}
-              Votações até {formatarData(pub.dados_ate)} · {pub.legislatura}ª legislatura ·
-              metodologia v{pub.versao_metodologia}.
-            </>
-          )}
-        </p>
-        <p>
-          Código aberto (MIT) e resultados sob CC BY 4.0 ·{" "}
-          <a href="https://github.com/dw-souza/polaritics">github.com/dw-souza/polaritics</a>
-        </p>
-      </div>
+      <p>
+        Fontes: Câmara dos Deputados (Dados Abertos). Classificação dos partidos: Bolognesi,
+        Ribeiro, Codato e Silva (2022).
+        {pub && (
+          <>
+            {" "}
+            Votações até {formatarData(pub.dados_ate)} · {pub.legislatura}ª legislatura ·
+            metodologia v{pub.versao_metodologia}.
+          </>
+        )}
+      </p>
+      <p>
+        Código aberto (MIT) e resultados sob CC BY 4.0 ·{" "}
+        <a href="https://github.com/dw-souza/polaritics">github.com/dw-souza/polaritics</a>
+      </p>
     </footer>
   );
 }
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className={`${archivo.variable} ${serif.variable}`}>
       <body>
-        <header className={estilos.cabecalho}>
-          <div className={`container ${estilos.barra}`}>
-            <Link href="/" className={estilos.marca}>
-              Polaritics
+        <div className="miolo">
+          <header className={estilos.topo}>
+            <Link href="/" className={estilos.nome}>
+              Polaritics<span>votos e governismo na Câmara</span>
             </Link>
-            <nav className={estilos.nav} aria-label="Principal">
+            <nav className={estilos.abas} aria-label="Principal">
               <Link href="/">Deputados</Link>
+              <Link href="/rankings">Rankings</Link>
               <Link href="/partidos">Partidos</Link>
               <Link href="/metodologia">Como funciona</Link>
             </nav>
+          </header>
+          <div className={estilos.regua} aria-hidden="true">
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <i key={i} style={{ background: `var(--faixa-${i})` }} />
+            ))}
           </div>
-        </header>
-        <main className={estilos.principal}>{children}</main>
-        <Rodape />
+          <main>{children}</main>
+          <Rodape />
+        </div>
       </body>
     </html>
   );

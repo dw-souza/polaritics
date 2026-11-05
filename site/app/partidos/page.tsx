@@ -2,10 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { LegendaFaixas } from "@/components/Regua";
 import { partidos, publicacaoAtual } from "@/lib/dados";
 import {
-  INTERVALOS_FAIXAS,
   VOTACOES,
   faixa,
   formatarNota,
@@ -22,17 +20,18 @@ export const metadata: Metadata = { title: "Partidos" };
 
 export default function PaginaPartidos(props: PageProps<"/partidos">) {
   return (
-    <div className="container">
-      <h1>Partidos: o que dizem ser e como votam</h1>
-      <p className="secundario">
-        Para cada partido com pelo menos 3 deputados: a classificação feita por especialistas
-        em ciência política e a posição mediana da bancada pelos votos em plenário. A distância
-        entre os dois mostra o quanto o comportamento de voto se afasta da classificação.
-      </p>
-      <Suspense fallback={<p className="secundario">Carregando…</p>}>
+    <>
+      <section className="cabeca-pagina">
+        <h1>O que os partidos dizem ser e como votam</h1>
+        <p>
+          A classificação feita por especialistas em ciência política, ao lado da posição da
+          bancada pelos votos em plenário. Quanto maior a linha, maior a diferença.
+        </p>
+      </section>
+      <Suspense fallback={<p className="discreto">Carregando…</p>}>
         <Conteudo {...props} />
       </Suspense>
-    </div>
+    </>
   );
 }
 
@@ -43,62 +42,61 @@ async function Conteudo({ searchParams }: PageProps<"/partidos">) {
 
   return (
     <>
-      <nav className={estilos.seletor} aria-label="Votações consideradas">
-        {(Object.keys(VOTACOES) as Votacoes[]).map((v) => (
-          <Link
-            key={v}
-            href={hrefVisao("/partidos", "voto", v)}
-            aria-current={v === votacoes ? "true" : undefined}
-            scroll={false}
-          >
-            {VOTACOES[v].nome}
-          </Link>
-        ))}
-      </nav>
+      <section className="secao">
+        <div className="secao-cab">
+          <nav className="seg" aria-label="Votações consideradas">
+            {(Object.keys(VOTACOES) as Votacoes[]).map((v) => (
+              <Link
+                key={v}
+                href={hrefVisao("/partidos", "voto", v)}
+                aria-current={v === votacoes ? "true" : undefined}
+                scroll={false}
+              >
+                {VOTACOES[v].nome}
+              </Link>
+            ))}
+          </nav>
+          <ul className={estilos.legenda}>
+            <li>
+              <span className={`${estilos.chave} ${estilos.esp}`} aria-hidden="true" />
+              Segundo especialistas
+            </li>
+            <li>
+              <span className={`${estilos.chave} ${estilos.voto}`} aria-hidden="true" />
+              Pelos votos (mediana da bancada)
+            </li>
+          </ul>
+        </div>
 
-      <section className="cartao">
-        <ul className={estilos.legenda}>
-          <li>
-            <span className={`${estilos.chave} ${estilos.esp}`} aria-hidden="true" /> Segundo
-            especialistas
-          </li>
-          <li>
-            <span className={`${estilos.chave} ${estilos.voto}`} aria-hidden="true" /> Pelos
-            votos (mediana da bancada)
-          </li>
-        </ul>
-        <div className={estilos.grafico} role="img" aria-label="Gráfico: posição dos partidos segundo especialistas e pelos votos. Os mesmos valores estão na tabela abaixo.">
+        <div
+          className={estilos.grafico}
+          role="img"
+          aria-label="Posição de cada partido segundo especialistas e pelos votos. Os valores estão na tabela abaixo."
+        >
           {linhas.map((l) => {
-            const a = l.nota_especialistas ?? l.nota_votos;
-            const [ini, fim] = a < l.nota_votos ? [a, l.nota_votos] : [l.nota_votos, a];
+            const esp = l.nota_especialistas;
+            const [ini, fim] =
+              esp === null ? [l.nota_votos, l.nota_votos] : [Math.min(esp, l.nota_votos), Math.max(esp, l.nota_votos)];
             return (
               <div key={l.partido} className={estilos.linha}>
                 <span className={estilos.sigla}>{l.partido}</span>
                 <div className={estilos.trilho}>
-                  {INTERVALOS_FAIXAS.map((f) => (
-                    <span
-                      key={f.rotulo}
-                      className={estilos.fundo}
-                      style={
-                        {
-                          left: pos(f.inicio),
-                          width: `${((f.fim - f.inicio) / 10) * 100}%`,
-                          "--cor": `var(--faixa-${f.indice})`,
-                        } as React.CSSProperties
-                      }
-                    />
-                  ))}
-                  {l.nota_especialistas !== null && (
+                  <div className={estilos.fundo} aria-hidden="true">
+                    {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                      <i key={i} style={{ color: `var(--faixa-${i})` }} />
+                    ))}
+                  </div>
+                  {esp !== null && (
                     <span
                       className={estilos.ligacao}
-                      style={{ left: pos(ini), width: `${((fim - ini) / 10) * 100}%` }}
+                      style={{ left: pos(ini), width: `${(fim - ini) * 10}%` }}
                     />
                   )}
-                  {l.nota_especialistas !== null && (
+                  {esp !== null && (
                     <span
                       className={`${estilos.ponto} ${estilos.esp}`}
-                      style={{ left: pos(l.nota_especialistas) }}
-                      title={`${l.partido} segundo especialistas: ${formatarNota(l.nota_especialistas)}`}
+                      style={{ left: pos(esp) }}
+                      title={`${l.partido} segundo especialistas: ${formatarNota(esp)}`}
                     />
                   )}
                   <span
@@ -121,36 +119,39 @@ async function Conteudo({ searchParams }: PageProps<"/partidos">) {
             </div>
           </div>
         </div>
-        <LegendaFaixas />
       </section>
 
-      <section className="cartao">
-        <h2>Tabela</h2>
+      <section className="secao">
+        <div className="secao-cab">
+          <h2>Os números</h2>
+        </div>
         <div className="tabela-rolagem">
           <table>
             <thead>
               <tr>
                 <th>Partido</th>
-                <th className="num">Deputados</th>
-                <th>Segundo especialistas</th>
+                <th className="n">Deputados</th>
+                <th>Especialistas</th>
                 <th>Pelos votos</th>
-                <th className="num">Governismo*</th>
+                <th className="n">Governismo</th>
               </tr>
             </thead>
             <tbody>
               {linhas.map((l) => (
                 <tr key={l.partido}>
-                  <td>{l.partido}</td>
-                  <td className="num">{l.n_deputados}</td>
+                  <td>
+                    <strong>{l.partido}</strong>
+                  </td>
+                  <td className="n">{l.n_deputados}</td>
                   <td>
                     {l.nota_especialistas !== null
-                      ? `${faixa(l.nota_especialistas)} (${formatarNota(l.nota_especialistas)})`
+                      ? `${faixa(l.nota_especialistas)} · ${formatarNota(l.nota_especialistas)}`
                       : "sem classificação"}
                   </td>
                   <td>
-                    {l.faixa_votos} ({formatarNota(l.nota_votos)})
+                    {l.faixa_votos} · {formatarNota(l.nota_votos)}
                   </td>
-                  <td className="num">
+                  <td className="n">
                     {l.governismo_disputadas !== null ? formatarPct(l.governismo_disputadas) : "—"}
                   </td>
                 </tr>
@@ -158,9 +159,9 @@ async function Conteudo({ searchParams }: PageProps<"/partidos">) {
             </tbody>
           </table>
         </div>
-        <p className="secundario pequeno" style={{ marginTop: 12 }}>
-          * Mediana dos deputados do partido: percentual de votos com o governo nas votações em
-          que governo e oposição discordaram. Classificação dos especialistas: Bolognesi, Ribeiro,
+        <p className={estilos.nota}>
+          Partidos com pelo menos 3 deputados. Governismo: mediana dos deputados do partido nas
+          votações em que governo e oposição discordaram. Especialistas: Bolognesi, Ribeiro,
           Codato e Silva (onda de 2022). <Link href="/metodologia">Como é calculado</Link>
         </p>
       </section>

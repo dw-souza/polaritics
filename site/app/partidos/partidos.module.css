@@ -1,34 +1,11 @@
-.seletor {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 16px 0;
-}
-
-.seletor a {
-  border: 1px solid var(--eixo);
-  border-radius: 999px;
-  padding: 4px 12px;
-  font-size: 0.875rem;
-  color: var(--tinta);
-  text-decoration: none;
-  background: var(--superficie);
-}
-
-.seletor a[aria-current="true"] {
-  background: var(--tinta);
-  border-color: var(--tinta);
-  color: var(--superficie);
-}
-
 .legenda {
   list-style: none;
   padding: 0;
-  margin: 0 0 12px;
+  margin: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 6px 20px;
-  font-size: 0.9rem;
+  font: 500 14px var(--f-dado);
 }
 
 .legenda li {
@@ -38,18 +15,19 @@
 }
 
 .grafico {
-  margin-bottom: 16px;
+  display: grid;
+  gap: 2px;
 }
 
 .linha {
   display: grid;
-  grid-template-columns: 7.5rem minmax(0, 1fr);
+  grid-template-columns: 8rem minmax(0, 1fr);
   align-items: center;
   gap: 12px;
 }
 
 .sigla {
-  font-size: 0.85rem;
+  font: 600 14px var(--f-dado);
   text-align: right;
   white-space: nowrap;
   overflow: hidden;
@@ -58,23 +36,29 @@
 
 .trilho {
   position: relative;
-  height: 26px;
+  height: 28px;
   margin-inline: 8px;
 }
 
 .fundo {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  border-right: 2px solid var(--superficie);
+  inset: 0;
+  display: grid;
+  grid-template-columns: var(--colunas-faixas);
+  gap: 2px;
 }
 
-.fundo::before {
+.fundo i {
+  position: relative;
+  display: block;
+}
+
+.fundo i::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--cor);
-  opacity: 0.16;
+  background: currentColor;
+  opacity: 0.13;
 }
 
 .ligacao {
@@ -88,33 +72,32 @@
 .ponto {
   position: absolute;
   top: 50%;
-  width: 12px;
-  height: 12px;
-  margin: -6px 0 0 -6px;
-  box-shadow: 0 0 0 2px var(--superficie);
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  box-shadow: 0 0 0 2px var(--papel);
 }
 
 .ponto.esp {
   background: var(--tinta);
-  transform: rotate(45deg) scale(0.85);
+  transform: rotate(45deg) scale(0.8);
 }
 
 .ponto.voto {
   border-radius: 50%;
-  background: var(--superficie);
+  background: var(--papel);
   border: 3px solid var(--tinta);
 }
 
 .chave {
-  position: relative;
   display: inline-block;
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
 }
 
 .chave.esp {
   background: var(--tinta);
-  transform: rotate(45deg) scale(0.85);
+  transform: rotate(45deg) scale(0.8);
 }
 
 .chave.voto {
@@ -125,15 +108,22 @@
 .eixo {
   position: relative;
   height: 20px;
-  margin-inline: 8px;
+  margin: 6px 8px 0;
+  font: 500 12px var(--f-dado);
   color: var(--tinta-3);
-  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
 
 .eixo span {
   position: absolute;
   transform: translateX(-50%);
+}
+
+.nota {
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--tinta-2);
+  max-width: 72ch;
 }
 
 @media (max-width: 480px) {

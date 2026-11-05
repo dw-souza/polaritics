@@ -68,13 +68,79 @@ export function hrefVisao(base: string, regua: Regua, votacoes: Votacoes): strin
 
 const fmtNota = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const fmtPct = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 0 });
+const fmtPctDecimal = new Intl.NumberFormat("pt-BR", {
+  style: "percent",
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
 const fmtData = new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "UTC" });
 const fmtDataCurta = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "UTC" });
 
 export const formatarNota = (n: number) => fmtNota.format(n);
 export const formatarPct = (n: number) => fmtPct.format(n);
+// Rankings: uma casa decimal, para valores próximos (99,6% e 99,8%) não parecerem empate.
+export const formatarPctDecimal = (n: number) => fmtPctDecimal.format(n);
+
+// Ementas reformuladas trazem o texto original seguido de "NOVA EMENTA:"; fica só a atual.
+export const ementaAtual = (ementa: string) => {
+  const i = ementa.toUpperCase().lastIndexOf("NOVA EMENTA:");
+  return (i >= 0 ? ementa.slice(i + "NOVA EMENTA:".length) : ementa).trim();
+};
 export const formatarData = (d: string | Date) => fmtData.format(new Date(d));
 export const formatarDataCurta = (d: string | Date) => fmtDataCurta.format(new Date(d));
 
 // Posição em % da largura da régua.
 export const pos = (nota: number) => `${(Math.min(Math.max(nota, 0), 10) / 10) * 100}%`;
+
+// Índice 1–7 da faixa, para a cor (--faixa-N).
+export const indiceFaixa = (nota: number) => FAIXAS.findIndex((f) => f.rotulo === faixa(nota)) + 1;
+
+// Frase da manchete por faixa ("Vota no centro", "Vota mais à direita").
+const VERBO_FAIXA: Record<string, string> = {
+  "Mais à esquerda": "Vota mais à esquerda",
+  Esquerda: "Vota na esquerda",
+  "Centro-esquerda": "Vota na centro-esquerda",
+  Centro: "Vota no centro",
+  "Centro-direita": "Vota na centro-direita",
+  Direita: "Vota na direita",
+  "Mais à direita": "Vota mais à direita",
+};
+
+export function fraseFaixa(faixaExibida: string, fronteira: boolean): { antes: string; destaque: string } {
+  if (fronteira) {
+    return { antes: "Vota na fronteira entre", destaque: faixaExibida.replace(/^Entre /, "") };
+  }
+  const verbo = VERBO_FAIXA[faixaExibida] ?? "Vota em";
+  // separa o verbo do nome da faixa, para o marca-texto cair só no nome
+  const corte = verbo.lastIndexOf(" ");
+  return verbo.startsWith("Vota mais")
+    ? { antes: "Vota", destaque: verbo.slice(5) }
+    : { antes: verbo.slice(0, corte), destaque: verbo.slice(corte + 1) };
+}
+
+const NOMES_CURTOS: Record<string, string> = {
+  "Luiz Inácio Lula da Silva": "Lula",
+  "Jair Bolsonaro": "Bolsonaro",
+};
+export const nomeCurtoGoverno = (chefe: string) => NOMES_CURTOS[chefe] ?? chefe;
+
+export const cargo = (sexo: string | null) =>
+  sexo === "F" ? "Deputada federal" : sexo === "M" ? "Deputado federal" : "Deputado(a) federal";
+
+export const iniciais = (nome: string) =>
+  nome
+    .split(" ")
+    .filter((p) => p.length > 2)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase();
+
+export const UFS: Record<string, string> = {
+  AC: "Acre", AL: "Alagoas", AM: "Amazonas", AP: "Amapá", BA: "Bahia", CE: "Ceará",
+  DF: "Distrito Federal", ES: "Espírito Santo", GO: "Goiás", MA: "Maranhão", MG: "Minas Gerais",
+  MS: "Mato Grosso do Sul", MT: "Mato Grosso", PA: "Pará", PB: "Paraíba", PE: "Pernambuco",
+  PI: "Piauí", PR: "Paraná", RJ: "Rio de Janeiro", RN: "Rio Grande do Norte", RO: "Rondônia",
+  RR: "Roraima", RS: "Rio Grande do Sul", SC: "Santa Catarina", SE: "Sergipe", SP: "São Paulo",
+  TO: "Tocantins",
+};

@@ -1,0 +1,23 @@
+.trilho {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--colunas-faixas);
+  gap: 2px;
+  height: 6px;
+}
+
+.trilho i {
+  display: block;
+  border-radius: 1px;
+}
+
+.ponto {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--tinta);
+  box-shadow: 0 0 0 2px var(--folha);
+}

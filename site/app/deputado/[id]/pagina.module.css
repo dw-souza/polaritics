@@ -1,56 +1,141 @@
-.cabecalho {
-  display: flex;
-  gap: 20px;
-  align-items: flex-end;
-  margin-bottom: 24px;
+.migalha {
+  font: 600 14px var(--f-dado);
+  color: var(--tinta-2);
+  margin-bottom: 18px;
 }
 
-.cabecalho h1 {
-  margin-bottom: 4px;
+.identidade {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px 24px;
+  align-items: center;
 }
 
-.cabecalho p {
-  margin: 0;
-}
-
-.foto {
-  border-radius: var(--raio);
-  object-fit: cover;
-  background: var(--grade);
-  flex: none;
-}
-
-.resumo {
-  font-size: 1.1rem;
-}
-
-.numeroGrande {
-  font-size: 3rem;
-  font-weight: 600;
+.identidade h1 {
+  font-size: clamp(36px, 6vw, 58px);
+  font-stretch: 78%;
+  font-weight: 800;
   line-height: 1;
-  margin: 0 0 8px;
 }
 
-.votacoes {
-  padding-left: 1.25em;
+.cargo {
+  font: 500 16px var(--f-dado);
+  color: var(--tinta-2);
+  margin-top: 8px;
+}
+
+.manchete {
+  font-size: clamp(21px, 2.6vw, 26px);
+  line-height: 1.4;
+  max-width: 34em;
+  margin: 26px 0 30px;
+}
+
+.blocos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 2px solid var(--tinta);
+  border-bottom: 1px solid var(--fio);
+}
+
+.bloco {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 18px 18px 20px 0;
+}
+
+.bloco + .bloco {
+  padding-left: 18px;
+  border-left: 1px solid var(--fio);
+}
+
+.valor {
+  font-family: var(--f-display);
+  font-stretch: 80%;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.valor small {
+  font-size: 18px;
+  font-weight: 600;
+  font-stretch: 90%;
+  color: var(--tinta-2);
+}
+
+.semDado {
+  font: 700 20px var(--f-display);
+  color: var(--tinta-2);
+}
+
+.pos {
+  font: 600 14px var(--f-dado);
+}
+
+.pos span {
+  color: var(--tinta-3);
+  font-weight: 500;
+}
+
+.bloco details {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--tinta-2);
+}
+
+.bloco summary {
+  font: 600 13px var(--f-dado);
+  color: var(--tinta-3);
+  cursor: pointer;
+  list-style: none;
+  width: fit-content;
+}
+
+.bloco summary::-webkit-details-marker {
+  display: none;
+}
+
+.bloco summary::before {
+  content: "?";
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+.regua {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.votos {
+  list-style: none;
+  padding: 0;
   margin: 0;
 }
 
-.votacoes li {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--grade);
+.votos li {
+  display: grid;
+  grid-template-columns: 9em minmax(0, 1fr);
+  gap: 4px 18px;
+  padding-block: 14px;
+  border-top: 1px solid var(--fio);
 }
 
-.votacoes li:last-child {
-  border-bottom: 0;
+.pl {
+  font: 700 15px var(--f-dado);
 }
 
-.votacoes p {
-  margin: 0 0 4px;
-}
-
-.votacaoTitulo {
-  font-weight: 600;
+.data {
+  font: 500 13px var(--f-dado);
+  color: var(--tinta-3);
 }
 
 .ementa {
@@ -60,25 +145,62 @@
   overflow: hidden;
 }
 
-.etiqueta {
+.voto {
   display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border: 1px solid var(--eixo);
-  border-radius: 999px;
+  font: 700 13px var(--f-dado);
   padding: 0 8px;
-  color: var(--tinta-2);
+  border: 1px solid var(--tinta);
+  border-radius: 4px;
 }
 
-@media (max-width: 480px) {
-  .cabecalho {
-    flex-direction: column;
-    align-items: flex-start;
+.anos {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+  max-width: 640px;
+  font: 500 15px var(--f-dado);
+}
+
+.anos li {
+  display: grid;
+  grid-template-columns: 3.5em minmax(0, 1fr) 7em;
+  gap: 12px;
+  align-items: center;
+}
+
+.trilho {
+  height: 12px;
+  background: var(--fio);
+  border-radius: 2px;
+}
+
+.trilho i {
+  display: block;
+  height: 100%;
+  background: var(--tinta);
+  border-radius: 2px;
+}
+
+@media (max-width: 860px) {
+  .blocos {
+    grid-template-columns: 1fr;
+  }
+
+  .bloco + .bloco {
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--fio);
   }
 }
 
-.faixas {
-  margin: 14px 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--grade);
+@media (max-width: 480px) {
+  .identidade {
+    grid-template-columns: 1fr;
+  }
+
+  .votos li {
+    grid-template-columns: 1fr;
+  }
 }
