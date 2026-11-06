@@ -5,6 +5,7 @@ Mostra como parlamentares **votam** e onde esse comportamento os coloca na escal
 - Usa somente dados oficiais: Câmara, Senado e TSE.
 - Cada resultado aponta para as votações que o explicam.
 - A metodologia é pública e versionada: [docs/metodologia.md](docs/metodologia.md).
+- Projeto independente, sem vínculo partidário, construído com ajuda de inteligência artificial (código e análise). As decisões de método foram tomadas e revisadas por uma pessoa e estão registradas na metodologia.
 - O plano de construção está em [docs/plano-base.md](docs/plano-base.md).
 
 ## Desenvolvimento

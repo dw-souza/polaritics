@@ -18,6 +18,21 @@ export default function Metodologia() {
       </section>
 
       <section className="secao leitura">
+        <h2>Sobre o projeto</h2>
+        <p>
+          O Polaritics é um projeto independente, sem vínculo partidário, em fase inicial. Foi
+          construído com ajuda de inteligência artificial, no código e na análise dos dados, e as
+          decisões de método foram tomadas e revisadas por uma pessoa. Ainda não tem domínio
+          próprio. Todas as informações vêm de fontes públicas, a metodologia está descrita no
+          documento público e o código é aberto.
+        </p>
+        <p>
+          Os resultados não são ajustados a pedido de nenhum parlamentar ou partido. Erros nos
+          dados podem ser apontados no repositório do projeto, e toda correção é documentada.
+        </p>
+      </section>
+
+      <section className="secao leitura">
         <h2>De onde vêm os dados</h2>
         <p>
           Só de fontes oficiais: as <strong>votações nominais em plenário</strong> registradas

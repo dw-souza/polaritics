@@ -43,6 +43,10 @@ async function Rodape() {
         )}
       </p>
       <p>
+        Projeto independente em fase inicial, feito com ajuda de inteligência artificial e com
+        metodologia pública. <Link href="/metodologia">Saiba mais</Link>
+      </p>
+      <p>
         Código aberto (MIT) e resultados sob CC BY 4.0 ·{" "}
         <a href="https://github.com/dw-souza/polaritics">github.com/dw-souza/polaritics</a>
       </p>
