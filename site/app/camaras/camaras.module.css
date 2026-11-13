@@ -1,0 +1,101 @@
+.uf {
+  font-size: 0.4em;
+  font-stretch: 90%;
+  font-weight: 600;
+  color: var(--tinta-3);
+  margin-left: 0.4em;
+  vertical-align: 0.25em;
+}
+
+.fatos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 2px solid var(--tinta);
+  border-bottom: 1px solid var(--fio);
+  margin-top: 6px;
+}
+
+.fatos > div {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 18px 18px 20px 0;
+}
+
+.fatos > div + div {
+  padding-left: 18px;
+  border-left: 1px solid var(--fio);
+}
+
+.grande {
+  font-family: var(--f-display);
+  font-stretch: 80%;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.medio {
+  font-family: var(--f-display);
+  font-stretch: 85%;
+  font-size: 24px;
+  font-weight: 750;
+  line-height: 1.15;
+}
+
+.lista {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0;
+}
+
+.lista li {
+  border-top: 1px solid var(--fio);
+}
+
+.lista a {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding-block: 18px;
+  text-decoration: none;
+}
+
+.lista a:hover strong {
+  text-decoration: underline;
+}
+
+.lista strong {
+  font: 800 30px var(--f-display);
+  font-stretch: 80%;
+}
+
+@media (max-width: 860px) {
+  .fatos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fatos > div:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .fatos > div:nth-child(n + 3) {
+    border-top: 1px solid var(--fio);
+  }
+}
+
+@media (max-width: 520px) {
+  .fatos {
+    grid-template-columns: 1fr;
+  }
+
+  .fatos > div + div {
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--fio);
+  }
+}
