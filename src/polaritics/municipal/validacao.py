@@ -269,19 +269,26 @@ def conferencia_placar(con, municipio) -> Resultado:
 
 
 def atualidade(con, municipio, legislatura) -> Resultado:
-    """Última votação registrada: câmaras param de lançar as sessões ou trocam de sistema."""
-    ultima, dias = con.execute(
-        """select max(data), current_date - max(data) from votacao_valida
-           where municipio = ? and legislatura = ?""",
+    """Última votação registrada: câmaras param de lançar as sessões ou trocam de sistema. Só
+    faz sentido para a legislatura em curso; numa encerrada, apenas registra as datas."""
+    ultima, dias, fim, encerrada = con.execute(
+        """select max(v.data), current_date - max(v.data), any_value(l.fim),
+                  any_value(l.fim) < current_date
+           from votacao_valida v
+           join legislatura l on l.municipio = v.municipio and l.numero = v.legislatura
+           where v.municipio = ? and v.legislatura = ?""",
         [municipio, legislatura],
     ).fetchone()
+    detalhe = f"Última votação registrada no sistema da câmara em {ultima:%d/%m/%Y}."
+    if encerrada:
+        detalhe += f" Legislatura encerrada em {fim:%d/%m/%Y}."
     return Resultado(
         "Atualidade dos dados (dias desde a última votação, indicador)",
         None,
-        float(dias),
-        "acompanhado",
+        None if encerrada else float(dias),
+        "acompanhado na legislatura em curso",
         "informativo",
-        f"Última votação registrada no sistema da câmara em {ultima:%d/%m/%Y}.",
+        detalhe,
         obrigatorio=False,
     )
 

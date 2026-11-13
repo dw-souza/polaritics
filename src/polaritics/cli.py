@@ -18,7 +18,7 @@ from polaritics.medidas.ideologia.calculo import VARIANTES, calcular_ideologia
 from polaritics.medidas.mandato import calcular_atividade, calcular_gastos, calcular_presenca
 from polaritics.municipal import pipeline
 from polaritics.municipal import publicar as publicar_municipal
-from polaritics.municipal.coleta import ColetorSAPL
+from polaritics.municipal.coleta import ENDPOINTS, ColetorSAPL, endpoints_a_baixar
 from polaritics.municipal.config import MUNICIPIOS
 from polaritics.municipal.siscam import ColetorSiscam
 from polaritics.publicar import neon
@@ -106,9 +106,10 @@ def municipal_coletar(args: argparse.Namespace) -> None:
         especialistas.baixar()
     for slug in args.municipio:
         m = MUNICIPIOS[slug]
-        contagem = ColetorSAPL(m).coletar()
-        votos, votacoes = contagem["votoparlamentar"], contagem["registrovotacao"]
-        print(f"{slug}: SAPL com {votos} votos em {votacoes} votações")
+        endpoints = endpoints_a_baixar(m, args.forcar)
+        if pulados := sorted(ENDPOINTS.keys() - endpoints.keys()):
+            print(f"{slug}: SAPL congelado desde a migração; já baixados: {', '.join(pulados)}")
+        ColetorSAPL(m).coletar(endpoints)
         if m.siscam:
             contagem = ColetorSiscam(m.siscam, m.dir_brutos).coletar()
             print(f"{slug}: Siscam com {contagem['votacoes']} votações nominais")
@@ -170,8 +171,11 @@ def main() -> None:
 
     p = sub.add_parser("municipal", help="câmaras municipais (SAPL)")
     sub_mun = p.add_subparsers(required=True)
-    q = sub_mun.add_parser("coletar", help="baixa os dados do SAPL da câmara")
+    q = sub_mun.add_parser("coletar", help="baixa os dados da câmara (SAPL e, se houver, Siscam)")
     q.add_argument("--municipio", nargs="+", choices=sorted(MUNICIPIOS), default=sorted(MUNICIPIOS))
+    q.add_argument(
+        "--forcar", action="store_true", help="baixa de novo também o SAPL congelado (Siscam)"
+    )
     q.set_defaults(func=municipal_coletar)
     q = sub_mun.add_parser("calcular", help="base, posição, medidas e validação (~1 min)")
     q.add_argument("--municipio", nargs="+", choices=sorted(MUNICIPIOS), default=sorted(MUNICIPIOS))
