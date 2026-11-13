@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { LegendaFaixas } from "@/components/Regua";
+import { URL_METODOLOGIA_MUNICIPAL } from "@/lib/municipal";
 
 export const metadata: Metadata = { title: "Como funciona" };
 
@@ -132,6 +133,36 @@ export default function Metodologia() {
           <strong>Projetos:</strong> PL, PLP, PEC e PDL apresentados como autor principal, e
           quantos foram aprovados na Câmara ou viraram lei. Quantidade não é qualidade, por isso o
           ranking é de projetos aprovados.
+        </p>
+      </section>
+
+      <section className="secao leitura">
+        <h2>Câmaras municipais</h2>
+        <p>
+          O mesmo modelo é aplicado aos vereadores, com os dados do sistema de cada câmara (SAPL).
+          Três coisas mudam, porque uma câmara municipal é pequena e quase sempre vota por
+          unanimidade:
+        </p>
+        <ul>
+          <li>
+            <strong>A régua</strong> é calibrada por todos os vereadores de partidos que
+            especialistas classificam como de esquerda e de direita, e não por um partido de cada
+            lado, que na câmara costuma ter um ou dois vereadores.
+          </li>
+          <li>
+            <strong>Os grupos de votação</strong> mostram quem vota de forma indistinguível: com
+            poucas votações divergentes, muitas posições se sobrepõem, e a página diz isso em vez de
+            fingir precisão.
+          </li>
+          <li>
+            <strong>O governismo</strong> é medido pelo voto nos projetos do prefeito, porque a
+            câmara não registra orientação de governo.
+          </li>
+        </ul>
+        <p>
+          Moções sobre política nacional entram no cálculo e muitas vezes são as votações que mais
+          separam os vereadores. Os detalhes estão no{" "}
+          <a href={URL_METODOLOGIA_MUNICIPAL}>anexo municipal da metodologia</a>.
         </p>
       </section>
 

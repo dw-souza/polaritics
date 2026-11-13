@@ -16,6 +16,11 @@ from polaritics.medidas.governismo import calcular_governismo
 from polaritics.medidas.ideologia import irt
 from polaritics.medidas.ideologia.calculo import VARIANTES, calcular_ideologia
 from polaritics.medidas.mandato import calcular_atividade, calcular_gastos, calcular_presenca
+from polaritics.municipal import pipeline
+from polaritics.municipal import publicar as publicar_municipal
+from polaritics.municipal.coleta import ColetorSAPL
+from polaritics.municipal.config import MUNICIPIOS
+from polaritics.municipal.siscam import ColetorSiscam
 from polaritics.publicar import neon
 from polaritics.validacao import relatorio
 
@@ -96,6 +101,40 @@ def publicar(args: argparse.Namespace) -> None:
     print(f"publicado no Postgres: legislatura {args.legislatura} ({', '.join(variantes)})")
 
 
+def municipal_coletar(args: argparse.Namespace) -> None:
+    if not especialistas.ARQUIVO.exists():
+        especialistas.baixar()
+    for slug in args.municipio:
+        m = MUNICIPIOS[slug]
+        contagem = ColetorSAPL(m).coletar()
+        votos, votacoes = contagem["votoparlamentar"], contagem["registrovotacao"]
+        print(f"{slug}: SAPL com {votos} votos em {votacoes} votações")
+        if m.siscam:
+            contagem = ColetorSiscam(m.siscam, m.dir_brutos).coletar()
+            print(f"{slug}: Siscam com {contagem['votacoes']} votações nominais")
+
+
+def municipal_calcular(args: argparse.Namespace) -> None:
+    irt.habilitar_cadeias_paralelas(args.cadeias)
+    vereditos = pipeline.calcular(
+        [MUNICIPIOS[s] for s in args.municipio], replicas=args.replicas, cadeias=args.cadeias
+    )
+    for (slug, legislatura), veredito in vereditos.items():
+        situacao = ", ".join(
+            f"{v}: {'publicável' if ok else 'NÃO publicável'}" for v, ok in veredito.items()
+        )
+        print(f"{slug} {legislatura}ª — {situacao}")
+        print(f"  relatório em data/published/validacao-{slug}-{legislatura}.md")
+
+
+def municipal_publicar(args: argparse.Namespace) -> None:
+    for slug in args.municipio:
+        publicadas = publicar_municipal.publicar(MUNICIPIOS[slug])
+        for legislatura, variantes in publicadas.items():
+            posicao = ", ".join(variantes) if variantes else "posição não aprovada"
+            print(f"{slug} {legislatura}ª publicada: governismo, presença; {posicao}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="polaritics")
     sub = parser.add_subparsers(required=True)
@@ -129,8 +168,23 @@ def main() -> None:
     p = sub.add_parser("base", help="constrói a base DuckDB a partir dos dados brutos")
     p.set_defaults(func=base)
 
+    p = sub.add_parser("municipal", help="câmaras municipais (SAPL)")
+    sub_mun = p.add_subparsers(required=True)
+    q = sub_mun.add_parser("coletar", help="baixa os dados do SAPL da câmara")
+    q.add_argument("--municipio", nargs="+", choices=sorted(MUNICIPIOS), default=sorted(MUNICIPIOS))
+    q.set_defaults(func=municipal_coletar)
+    q = sub_mun.add_parser("calcular", help="base, posição, medidas e validação (~1 min)")
+    q.add_argument("--municipio", nargs="+", choices=sorted(MUNICIPIOS), default=sorted(MUNICIPIOS))
+    q.add_argument("--replicas", type=int, default=100, help="réplicas do bootstrap")
+    q.add_argument("--cadeias", type=int, default=2)
+    q.set_defaults(func=municipal_calcular)
+    q = sub_mun.add_parser("publicar", help="publica os resultados validados no Postgres")
+    q.add_argument("--municipio", nargs="+", choices=sorted(MUNICIPIOS), default=sorted(MUNICIPIOS))
+    q.set_defaults(func=municipal_publicar)
+
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # uma linha por requisição no SAPL
     args.func(args)
 
 

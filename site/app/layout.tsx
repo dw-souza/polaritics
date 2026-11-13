@@ -67,6 +67,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/">Deputados</Link>
               <Link href="/rankings">Rankings</Link>
               <Link href="/partidos">Partidos</Link>
+              <Link href="/camaras">Câmaras</Link>
               <Link href="/metodologia">Como funciona</Link>
             </nav>
           </header>

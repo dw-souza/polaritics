@@ -1,0 +1,142 @@
+.figura {
+  margin: 0;
+  --largura-nomes: 13rem;
+}
+
+.grade {
+  position: relative;
+  display: grid;
+  gap: 6px;
+}
+
+/* Faixas ao fundo, só na coluna da escala. */
+.fundo {
+  position: absolute;
+  inset: 0 8px 0 calc(var(--largura-nomes) + 24px);
+  display: grid;
+  grid-template-columns: var(--colunas-faixas);
+  gap: 2px;
+}
+
+.fundo i {
+  position: relative;
+  display: block;
+}
+
+.fundo i::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0.12;
+}
+
+.grupo {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--fio-forte);
+}
+
+.grupo:last-child {
+  border-bottom: 0;
+}
+
+.cabGrupo {
+  padding: 6px 0 2px;
+}
+
+.linha {
+  display: grid;
+  grid-template-columns: var(--largura-nomes) minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 4px;
+}
+
+.destaque {
+  background: color-mix(in srgb, var(--marca) 55%, transparent);
+}
+
+.nome {
+  font: 600 14px var(--f-dado);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nome:hover {
+  text-decoration: underline;
+}
+
+.nome span {
+  font-weight: 500;
+  color: var(--tinta-3);
+  margin-left: 6px;
+}
+
+.trilha {
+  position: relative;
+  height: 24px;
+  margin: 0 8px;
+}
+
+.intervalo {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--tinta-2);
+}
+
+.ponto {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--tinta);
+  box-shadow: 0 0 0 2px var(--folha);
+}
+
+.eixo {
+  position: relative;
+  height: 18px;
+  margin: 6px 8px 0 calc(var(--largura-nomes) + 24px);
+  font: 500 12px var(--f-dado);
+  color: var(--tinta-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.eixo span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 640px) {
+  .figura {
+    --largura-nomes: 7.5rem;
+  }
+
+  .linha {
+    gap: 8px;
+  }
+
+  .fundo {
+    left: calc(var(--largura-nomes) + 16px);
+  }
+
+  .eixo {
+    margin-left: calc(var(--largura-nomes) + 16px);
+  }
+
+  .nome span {
+    display: block;
+    margin-left: 0;
+    font-size: 12px;
+  }
+}
