@@ -33,6 +33,7 @@ export default function PaginaCamara(props: PageProps<"/camaras/[municipio]">) {
 }
 
 const ano = (d: string) => d.slice(0, 4);
+const DIAS_SEM_DADOS = 60;
 
 async function Camara({ params, searchParams }: PageProps<"/camaras/[municipio]">) {
   const { municipio: slug } = await params;
@@ -95,6 +96,13 @@ async function Camara({ params, searchParams }: PageProps<"/camaras/[municipio]"
           </nav>
         </div>
         <Fatos leg={leg} unanimes={unanimes} grupos={grupos} n={comPosicao.length} />
+        {leg.dados_ate && leg.em_curso && (leg.dias_sem_dados ?? 0) > DIAS_SEM_DADOS && (
+          <p className="aviso" style={{ marginTop: 16 }}>
+            <strong>Dados parados.</strong> A câmara não registra votações no seu sistema (SAPL)
+            desde {formatarData(leg.dados_ate)}. Os números refletem só o que foi publicado até
+            essa data.
+          </p>
+        )}
       </section>
 
       <section className="secao">
@@ -125,7 +133,7 @@ async function Camara({ params, searchParams }: PageProps<"/camaras/[municipio]"
         <div className="secao-cab">
           <h2>Todos os vereadores</h2>
         </div>
-        <Tabela linhas={linhas} hrefVereador={hrefVereador} />
+        <Tabela linhas={linhas} hrefVereador={hrefVereador} publicada={publicada} />
       </section>
     </>
   );
@@ -184,9 +192,11 @@ function Fatos({
 function Tabela({
   linhas,
   hrefVereador,
+  publicada,
 }: {
   linhas: LinhaVereador[];
   hrefVereador: (id: string) => string;
+  publicada: boolean;
 }) {
   const ordenadas = [...linhas].sort(
     (a, b) => (a.posicao?.posicao ?? 99) - (b.posicao?.posicao ?? 99) || a.nome.localeCompare(b.nome),
@@ -218,7 +228,9 @@ function Tabela({
                     <span className="discreto">{l.posicao.faixa_exibida.toLowerCase()}</span>
                   </>
                 ) : (
-                  <span className="discreto">votos insuficientes</span>
+                  <span className="discreto">
+                    {publicada ? "votos insuficientes" : "não publicada"}
+                  </span>
                 )}
               </td>
               <td className="n">

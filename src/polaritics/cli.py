@@ -127,7 +127,8 @@ def municipal_publicar(args: argparse.Namespace) -> None:
     for slug in args.municipio:
         publicadas = publicar_municipal.publicar(MUNICIPIOS[slug])
         for legislatura, variantes in publicadas.items():
-            print(f"{slug} {legislatura}ª publicada ({', '.join(variantes)})")
+            posicao = ", ".join(variantes) if variantes else "posição não aprovada"
+            print(f"{slug} {legislatura}ª publicada: governismo, presença; {posicao}")
 
 
 def main() -> None:

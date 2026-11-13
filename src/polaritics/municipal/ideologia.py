@@ -201,7 +201,9 @@ def _gravar(con, municipio, legislatura, variante, m, regua: ReguaGrupos, r) -> 
     notas = np.array([regua.nota_polos(theta) for theta in r.theta])
     p05, p50, p95 = np.percentile(notas, [5, 50, 95], axis=0)
     pos = posicoes_na_camara(r.theta)
-    pos05, pos50, pos95 = np.percentile(pos, [5, 50, 95], axis=0, method="nearest")
+    pos05, pos95 = np.percentile(pos, [5, 95], axis=0, method="nearest")
+    # ordem publicada: pela mediana da posição, sem empates (a mediana das ordens empata)
+    pos50 = np.argsort(np.argsort(np.median(r.theta, axis=0))) + 1
     grupo = grupos_de_votacao(r.theta)
     tamanho = np.bincount(grupo)[grupo]
     theta50 = np.median(r.theta, axis=0)

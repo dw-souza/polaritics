@@ -267,12 +267,31 @@ def conferencia_placar(con, municipio) -> Resultado:
     )
 
 
+def atualidade(con, municipio, legislatura) -> Resultado:
+    """Última votação registrada no SAPL: câmaras às vezes param de lançar as sessões."""
+    ultima, dias = con.execute(
+        """select max(data), current_date - max(data) from votacao_valida
+           where municipio = ? and legislatura = ?""",
+        [municipio, legislatura],
+    ).fetchone()
+    return Resultado(
+        "Atualidade dos dados (dias desde a última votação, indicador)",
+        None,
+        float(dias),
+        "acompanhado",
+        "informativo",
+        f"Última votação registrada no SAPL em {ultima:%d/%m/%Y}.",
+        obrigatorio=False,
+    )
+
+
 def avaliar(con, municipio: str, legislatura: int, replicas: int = 100):
     sensibilidade, mudam = sensibilidade_variantes(con, municipio, legislatura)
     resultados = [
         sensibilidade,
         peso_mocoes(con, municipio, legislatura),
         conferencia_placar(con, municipio),
+        atualidade(con, municipio, legislatura),
     ]
     for variante in VARIANTES_PUBLICADAS:
         resultados += [

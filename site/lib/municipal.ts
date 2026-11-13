@@ -18,6 +18,8 @@ export type LegislaturaMunicipal = {
   variantes: string[]; // variantes da posição aprovadas na validação
   versao_metodologia: string | null;
   dados_ate: string | null;
+  dias_sem_dados: number | null;
+  em_curso: boolean;
 };
 
 export type PosicaoVereador = {
@@ -124,7 +126,9 @@ export async function legislaturas(slug: string): Promise<LegislaturaMunicipal[]
     select l.numero, l.inicio::text as inicio, l.fim::text as fim, l.prefeito,
            l.partido_prefeito, l.n_votacoes, l.n_divergentes,
            coalesce(p.variantes, '{}') as variantes, p.versao_metodologia,
-           p.dados_ate::text as dados_ate
+           p.dados_ate::text as dados_ate,
+           (current_date - p.dados_ate)::int as dias_sem_dados,
+           l.fim >= current_date as em_curso
     from municipal.legislatura l
     left join lateral (
         select variantes, versao_metodologia, dados_ate from municipal.publicacao p

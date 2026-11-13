@@ -182,8 +182,14 @@ async function Legislatura({
                 {formatarNota(p.nota)} <small>{p.faixa_exibida.toLowerCase()}</small>
               </span>
               <span className={estilos.pos}>
-                Entre {formatarNota(p.nota_p05)} e {formatarNota(p.nota_p95)}{" "}
-                <span>(90% de certeza)</span>
+                {p.polo_unico ? (
+                  <span>referência da régua (ver abaixo)</span>
+                ) : (
+                  <>
+                    Entre {formatarNota(p.nota_p05)} e {formatarNota(p.nota_p95)}{" "}
+                    <span>(90% de certeza)</span>
+                  </>
+                )}
               </span>
             </>
           ) : (
@@ -384,7 +390,12 @@ function marcadores(
   esp: number | null,
 ): Marcador[] {
   const m: Marcador[] = [
-    { rotulo: nome, nota: p.nota, intervalo: [p.nota_p05, p.nota_p95], forma: "ponto" },
+    {
+      rotulo: nome,
+      nota: p.nota,
+      intervalo: p.polo_unico ? undefined : [p.nota_p05, p.nota_p95],
+      forma: "ponto",
+    },
   ];
   if (partido && esp !== null) {
     m.push({
