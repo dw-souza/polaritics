@@ -9,7 +9,13 @@ import pytest
 from polaritics.config import Periodo
 from polaritics.municipal import base as base_mun
 from polaritics.municipal import siscam
-from polaritics.municipal.coleta import ColetorSAPL, ErroColetaSAPL
+from polaritics.municipal.coleta import (
+    CONGELADOS_COM_SISCAM,
+    ENDPOINTS,
+    ColetorSAPL,
+    ErroColetaSAPL,
+    endpoints_a_baixar,
+)
 from polaritics.municipal.config import Municipio, Prefeito
 from polaritics.municipal.ideologia import (
     ReguaGrupos,
@@ -429,3 +435,18 @@ def test_base_com_siscam_recusa_vereador_fora_do_cadastro(brutos):
         base_mun.construir_base(
             [municipio], raiz / "s.duckdb", especialistas, raiz_brutos=raiz / "raw"
         )
+
+
+def test_sapl_congelado_nao_e_baixado_de_novo(tmp_path, monkeypatch):
+    monkeypatch.setattr("polaritics.municipal.config.DIR_BRUTOS", tmp_path)
+    com_siscam = Municipio("teste", "Teste", "SP", "x", MUNICIPIO.prefeitos, siscam="y")
+    pasta = com_siscam.dir_brutos
+    pasta.mkdir(parents=True)
+    (pasta / "votoparlamentar.json").write_text("[]")
+    assert "votoparlamentar" not in endpoints_a_baixar(com_siscam)
+    assert "registrovotacao" in endpoints_a_baixar(com_siscam)  # ainda não baixado
+    assert "parlamentar" in endpoints_a_baixar(com_siscam)  # cadastro sempre
+    assert endpoints_a_baixar(com_siscam, forcar=True) == ENDPOINTS
+    sem_siscam = Municipio("teste", "Teste", "SP", "x", MUNICIPIO.prefeitos)
+    assert endpoints_a_baixar(sem_siscam) == ENDPOINTS
+    assert set(CONGELADOS_COM_SISCAM) <= ENDPOINTS.keys()
