@@ -7,6 +7,7 @@ Mostra como parlamentares **votam** e onde esse comportamento os coloca na escal
 - A metodologia é pública e versionada: [docs/metodologia.md](docs/metodologia.md).
 - Projeto independente, sem vínculo partidário, construído com ajuda de inteligência artificial (código e análise). As decisões de método foram tomadas e revisadas por uma pessoa e estão registradas na metodologia.
 - O plano de construção está em [docs/plano-base.md](docs/plano-base.md).
+- Câmaras municipais (em teste, começando por Franca-SP) seguem um anexo da metodologia: [docs/metodologia-municipal.md](docs/metodologia-municipal.md).
 
 ## Desenvolvimento
 
@@ -32,6 +33,18 @@ uv run polaritics publicar    # carrega no Postgres só o que foi aprovado (~5 s
 `publicar` lê a conexão direta (unpooled) do Neon da variável `POLARITICS_DATABASE_URL`, no ambiente ou num arquivo `.env` local. O `.env` fica fora do git.
 
 A validação com a Pesquisa Legislativa Brasileira usa um arquivo baixado manualmente, porque o Dataverse exige cadastro (guestbook). O repositório guarda só o resumo por partido, em `dados/referencia/`, para a atualização automática. Veja `src/polaritics/coleta/bls.py`.
+
+### Câmaras municipais
+
+Os dados vêm da API do SAPL (Interlegis) de cada câmara, configurada em `src/polaritics/municipal/config.py`. Como o modelo de uma câmara pequena roda em segundos, `calcular` recria a base e os resultados juntos, em `data/processed/municipal.duckdb`.
+
+```bash
+uv run polaritics municipal coletar     # baixa o SAPL (~30 min em Franca; a API é lenta)
+uv run polaritics municipal calcular    # base, posição, governismo, presença e validação (~1 min)
+uv run polaritics municipal publicar    # carrega no Postgres, schema `municipal`
+```
+
+O relatório de validação de cada legislatura fica em `data/published/validacao-<município>-<legislatura>.md`.
 
 ### Atualização automática
 

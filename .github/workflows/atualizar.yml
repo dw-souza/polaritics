@@ -60,3 +60,38 @@ jobs:
             data/raw/camara/manifesto.json
           retention-days: 90
           if-no-files-found: ignore
+
+  # Câmaras municipais (SAPL), em job separado: falha aqui não bloqueia a Câmara dos Deputados.
+  municipal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-extras
+
+      - name: Coletar o SAPL das câmaras
+        run: uv run polaritics municipal coletar
+      - name: Calcular e validar
+        run: uv run polaritics municipal calcular
+
+      - name: Resumo da validação
+        if: always()
+        run: cat data/published/validacao-*-*.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Publicar no Neon
+        if: github.event_name == 'schedule' || inputs.publicar
+        env:
+          POLARITICS_DATABASE_URL: ${{ secrets.POLARITICS_DATABASE_URL }}
+        run: uv run polaritics municipal publicar
+
+      - name: Guardar relatórios e manifestos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: municipal-${{ github.run_number }}
+          path: |
+            data/published/
+            data/raw/municipal/*/manifesto.json
+          retention-days: 90
+          if-no-files-found: ignore
