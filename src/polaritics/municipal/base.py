@@ -1,11 +1,14 @@
-"""Constrói a base municipal (DuckDB) a partir dos JSON do SAPL. Sempre recria do zero."""
+"""Constrói a base municipal (DuckDB) a partir dos JSON do SAPL e, nas câmaras que migraram,
+do Siscam. Sempre recria do zero."""
 
 import json
 import logging
 import re
+import unicodedata
 from pathlib import Path
 
 import duckdb
+import pyarrow as pa
 
 from polaritics.base.partidos import harmonizar
 from polaritics.coleta import especialistas
@@ -133,7 +136,8 @@ def _carregar_materias(con, m: Municipio, brutos: Path) -> None:
     con.execute(
         f"""
         insert into materia
-        select ?, m.id::varchar, t.sigla, t.descricao, m.numero, m.ano,
+        select ?, m.id::varchar, t.descricao || ' nº ' || m.numero || ' de ' || m.ano, t.sigla,
+               t.descricao, m.numero, m.ano,
                nullif(trim(m.ementa), ''), list_has_any(m.autores, ?::bigint[])
         from {_json(brutos, "materia")} m
         left join {_json(brutos, "tipomateria")} t on t.id = m.tipo
@@ -160,7 +164,8 @@ def _carregar_votacoes(con, m: Municipio, brutos: Path) -> None:
         select r.municipio, r.id_votacao, r.data, l.numero, r.id_materia, r.placar_sim,
                r.placar_nao,
                case when mt.sigla_tipo in ({procedimento}) then 'procedimento' else 'merito' end,
-               coalesce(lower(mt.tipo) like 'moção%', false)
+               coalesce(lower(mt.tipo) like 'moção%', false),
+               '{m.sapl}/materia/' || r.id_materia
         from registro r
         left join materia mt on mt.municipio = r.municipio and mt.id_materia = r.id_materia
         left join legislatura l on l.municipio = r.municipio and r.data between l.inicio and l.fim
@@ -194,6 +199,182 @@ def _carregar_presenca(con, m: Municipio, brutos: Path) -> None:
             (m.slug, str(r["sessao_plenaria"]), str(r["parlamentar"]))
             for r in _ler(brutos, "presenca")
         ],
+    )
+
+
+# Início do título da matéria no Siscam (sem a sigla "XX - ") → (sigla, tipo), nas siglas do
+# SAPL usadas pelas regras de procedimento e de governismo. A ordem importa: o mais específico
+# primeiro.
+TIPOS_SISCAM = [
+    ("requerimento urgência", ("RU", "Requerimento de Urgência")),
+    ("requerimento de urgência", ("RU", "Requerimento de Urgência")),
+    ("requerimento", ("Req", "Requerimento")),
+    ("ata", ("ATA", "Ata")),
+    ("redação final", ("RF", "Redação final")),
+    ("moção", ("MO", "Moção")),
+    ("projeto de lei complementar", ("PLC", "Projeto de Lei Complementar")),
+    ("projeto de lei", ("PLO", "Projeto de Lei Ordinária")),
+    ("projeto de emenda à lei orgânica", ("PELOM", "Projeto de Emenda à Lei Orgânica")),
+    ("projeto de decreto legislativo", ("PDL", "Projeto de Decreto Legislativo")),
+    ("projeto de resolução", ("PR", "Projeto de Resolução")),
+    ("emenda", ("Emen", "Emenda")),
+    ("substitutivo", ("SUB", "Substitutivo")),
+    ("veto", ("Veto", "Veto")),
+    ("parecer", ("Par", "Parecer")),
+    ("indicação", ("Ind", "Indicação")),
+]
+# Grupos de voto do Siscam → (voto como no SAPL, codificação da metodologia)
+VOTOS_SISCAM = {
+    "A Favor": ("Sim", 1),
+    "Contra": ("Não", 0),
+    "Abstenções": ("Abstenção", None),
+    "Abstenção": ("Abstenção", None),
+    "Não votaram": ("Não Votou", None),
+    "Ausentes": ("Ausente", None),
+}
+
+
+def classificar_titulo(titulo: str) -> tuple[str | None, str | None]:
+    """Tipo da matéria pelo título do Siscam (ex.: "PLO - Projeto de Lei Ordinária Nº 1/2026",
+    "Emenda ao Projeto Nº 265/2021", "Moção ao Aplauso Nº 3/2025")."""
+    texto = re.sub(r"^[A-Z]{1,6}\s*-\s*", "", titulo.strip()).lower()
+    texto = re.sub(r"^em-", "", texto)
+    for inicio, tipo in TIPOS_SISCAM:
+        if texto.startswith(inicio):
+            return tipo
+    return None, None
+
+
+def normalizar_nome(nome: str) -> str:
+    sem_acento = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode()
+    return " ".join(sem_acento.lower().split())
+
+
+def _ids_por_nome(con, m: Municipio, nomes: set[str]) -> dict[str, str]:
+    """Liga o nome parlamentar do Siscam ao vereador do cadastro do SAPL."""
+    cadastro = {
+        normalizar_nome(nome): id_
+        for id_, nome in con.execute(
+            "select id_vereador, nome from vereador where municipio = ?", [m.slug]
+        ).fetchall()
+    }
+    faltando = sorted(n for n in nomes if normalizar_nome(n) not in cadastro)
+    if faltando:
+        raise ValueError(f"{m.slug}: vereadores do Siscam ausentes do cadastro: {faltando}")
+    return {n: cadastro[normalizar_nome(n)] for n in nomes}
+
+
+PREFIXO_SISCAM = "siscam-"  # ids do Siscam colidem com os do SAPL
+
+
+def _carregar_siscam(con, m: Municipio, brutos: Path) -> None:
+    """Votações, matérias e presença do Siscam posteriores à última votação do SAPL
+    (metodologia municipal, M1). O histórico anterior que o Siscam herdou do SAPL tem votações
+    ligadas a sessões e datas erradas, então o período do SAPL vem do próprio SAPL."""
+    corte = con.execute(
+        "select max(data)::varchar from votacao where municipio = ?", [m.slug]
+    ).fetchone()[0]
+    votacoes = [r for r in _ler(brutos, "siscam_votacoes") if corte is None or r["data"] > corte]
+    frequencias = [
+        r for r in _ler(brutos, "siscam_frequencias") if corte is None or r["data"] > corte
+    ]
+    log.info("%s: Siscam a partir de %s (%d votações)", m.slug, corte, len(votacoes))
+    nomes = {v["nome"] for r in votacoes + frequencias for g in r["grupos"].values() for v in g}
+    ids = _ids_por_nome(con, m, nomes)
+    executivo = {p.nome for p in m.prefeitos} | {"Poder Executivo"}
+
+    materias: dict[str, dict] = {}
+    linhas_votacao, linhas_voto = [], []
+    vistas = set()
+    for r in sorted(votacoes, key=lambda r: r["id"]):
+        # O Siscam repete algumas votações sob outro id (mesmo documento, sessão, dia e votos).
+        # Como na Câmara (metodologia, seção 3), fica só o primeiro registro.
+        chave = (r["titulo"], r["id_sessao"], r["data"], json.dumps(r["grupos"], sort_keys=True))
+        if r["grupos"] and chave in vistas:
+            continue
+        vistas.add(chave)
+        sigla, tipo = classificar_titulo(r["titulo"])
+        autores = {a.strip() for a in (r["autoria"] or "").split(",")}
+        numero = re.search(r"N[ºo°]\s*(\d+)/(\d{4})", r["titulo"])
+        mat = materias.setdefault(
+            r["titulo"],
+            {
+                "municipio": m.slug,
+                "id_materia": r["titulo"],
+                "titulo": r["titulo"],
+                "sigla_tipo": sigla,
+                "tipo": tipo,
+                "numero": int(numero[1]) if numero else None,
+                "ano": int(numero[2]) if numero else None,
+                "ementa": r["ementa"],
+                "do_executivo": False,
+            },
+        )
+        mat["do_executivo"] = mat["do_executivo"] or bool(autores & executivo)
+        desconhecidos = set(r["grupos"]) - set(VOTOS_SISCAM)
+        if desconhecidos:
+            raise ValueError(f"votação {r['id']}: grupos de voto desconhecidos {desconhecidos}")
+        for grupo, votantes in r["grupos"].items():
+            original, codificado = VOTOS_SISCAM[grupo]
+            for v in votantes:
+                linhas_voto.append(
+                    {
+                        "municipio": m.slug,
+                        "id_votacao": PREFIXO_SISCAM + str(r["id"]),
+                        "id_vereador": ids[v["nome"]],
+                        "voto_original": original,
+                        "voto_codificado": codificado,
+                    }
+                )
+        linhas_votacao.append(
+            {
+                "municipio": m.slug,
+                "id_votacao": PREFIXO_SISCAM + str(r["id"]),
+                "data": r["data"],
+                "id_materia": r["titulo"],
+                "placar_sim": len(r["grupos"].get("A Favor", [])),
+                "placar_nao": len(r["grupos"].get("Contra", [])),
+                "tipo": "procedimento" if sigla in TIPOS_PROCEDIMENTO else "merito",
+                "eh_mocao": sigla == "MO",
+                "url": f"{m.siscam}/Siscam/Votacoes/Details?id={r['id']}",
+            }
+        )
+    con.register("materias_siscam", pa.Table.from_pylist(list(materias.values())))
+    con.execute("insert into materia select * from materias_siscam")
+    con.register("votacoes_siscam", pa.Table.from_pylist(linhas_votacao))
+    con.execute("""
+        insert into votacao
+        select v.municipio, v.id_votacao, v.data::date, l.numero, v.id_materia, v.placar_sim,
+               v.placar_nao, v.tipo, v.eh_mocao, v.url
+        from votacoes_siscam v
+        left join legislatura l on l.municipio = v.municipio
+             and v.data::date between l.inicio and l.fim
+    """)
+    con.register("votos_siscam", pa.Table.from_pylist(linhas_voto))
+    con.execute("insert into voto select * from votos_siscam")
+
+    # Presença: presente na sessão quem aparece em "Presentes" em alguma chamada dela
+    sessoes = {}
+    for r in frequencias:
+        if r["id_sessao"] is None:
+            continue
+        tipo = re.search(r"Sessão (Ordinária|Extraordinária|Solene)", r["sessao"] or "")
+        dia = min(r["data"], sessoes.get(r["id_sessao"], (r["data"],))[0])
+        sessoes[r["id_sessao"]] = (dia, f"Sessão {tipo[1]}" if tipo else None)
+    con.executemany(
+        "insert into sessao values (?, ?, ?, ?)",
+        [(m.slug, PREFIXO_SISCAM + str(i), dia, tipo) for i, (dia, tipo) in sessoes.items()],
+    )
+    con.executemany(
+        "insert into presenca values (?, ?, ?)",
+        sorted(
+            {
+                (m.slug, PREFIXO_SISCAM + str(r["id_sessao"]), ids[v["nome"]])
+                for r in frequencias
+                if r["id_sessao"] is not None
+                for v in r["grupos"].get("Presentes", [])
+            }
+        ),
     )
 
 
@@ -240,6 +421,8 @@ def construir_base(
             _carregar_materias(con, m, brutos)
             _carregar_votacoes(con, m, brutos)
             _carregar_presenca(con, m, brutos)
+            if m.siscam:
+                _carregar_siscam(con, m, brutos)
     temporario.replace(destino)
     log.info("base municipal construída em %s", destino)
     return destino

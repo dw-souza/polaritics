@@ -8,6 +8,7 @@ import pytest
 
 from polaritics.config import Periodo
 from polaritics.municipal import base as base_mun
+from polaritics.municipal import siscam
 from polaritics.municipal.coleta import ColetorSAPL, ErroColetaSAPL
 from polaritics.municipal.config import Municipio, Prefeito
 from polaritics.municipal.ideologia import (
@@ -278,3 +279,153 @@ def test_coleta_falha_se_faltarem_registros(tmp_path):
     cliente = httpx.Client(transport=httpx.MockTransport(ServidorSAPL(total=150, informado=250)))
     with pytest.raises(ErroColetaSAPL):
         ColetorSAPL(MUNICIPIO, tmp_path, cliente).coletar({"v": "sessao/votoparlamentar"})
+
+
+# --- Siscam ---------------------------------------------------------------------------------
+
+ITEM_SISCAM = """
+<div class="data-list-item">
+  <h4><a href="/Siscam/Votacoes/Details?id={id}">{titulo}</a></h4>
+  <p><strong>Sess&#xE3;o Plen&#xE1;ria:</strong>
+     <a href="/Siscam/Reunioes/Details?id=814">Sess&#xE3;o Ordin&#xE1;ria N&#xBA; 11/2026</a></p>
+  <div class="row"><p class="col-md"><strong>Data:</strong> 01/04/2026</p></div>
+  <p class="text-justify"><strong>Ementa:</strong> Algo.</p>
+  <p><strong>Autoria: </strong>{autoria}</p>
+  <div class="row"><p class="col-md"><strong>Tipo:</strong> Nominal</p>
+    <p class="col-md"><strong>Data:</strong> 14/04/2026</p>
+    <p class="col-md"><strong>Resultado:</strong> Mantida</p></div>
+  {grupos}
+</div>"""
+
+
+def item_siscam(id_, titulo, grupos, autoria="Ana Lima (Ana)"):
+    html_grupos = "".join(
+        f"<p class='text-justify'><strong>{g} ({len(ns)}):</strong> "
+        + ", ".join(f"{n} Civil ({n})" for n in ns)
+        + "</p>"
+        for g, ns in grupos.items()
+    )
+    return ITEM_SISCAM.format(id=id_, titulo=titulo, autoria=autoria, grupos=html_grupos)
+
+
+def pagina_siscam(itens, total=None):
+    return (
+        "".join(itens)
+        + f"<p>{total if total is not None else len(itens)} registros encontrados</p>"
+    )
+
+
+def test_interpreta_listagem_do_siscam():
+    pagina = pagina_siscam(
+        [
+            item_siscam(
+                2485,
+                "Parecer ao Projeto N&#xBA; 7/2026",
+                {"A Favor": ["Ana"], "Contra": ["Bia", "Cris"]},
+            )
+        ],
+        total=1,
+    )
+    (r,), total = siscam.interpretar_listagem(pagina)
+    assert total == 1
+    assert r["id"] == 2485 and r["titulo"] == "Parecer ao Projeto Nº 7/2026"
+    assert r["data"] == "2026-04-14" and r["data_documento"] == "2026-04-01"
+    assert r["id_sessao"] == 814 and r["autoria"] == "Ana Lima (Ana)"
+    assert [v["nome"] for v in r["grupos"]["Contra"]] == ["Bia", "Cris"]
+
+
+def test_listagem_do_siscam_com_contagem_errada_falha():
+    pagina = pagina_siscam([item_siscam(1, "Moção Nº 1/2026", {"A Favor": ["Ana"]})])
+    pagina = pagina.replace("A Favor (1)", "A Favor (2)")
+    with pytest.raises(siscam.ErroColetaSiscam):
+        siscam.interpretar_listagem(pagina)
+
+
+@pytest.mark.parametrize(
+    ("titulo", "sigla"),
+    [
+        ("PLO - Projeto de Lei Ordinária Nº 145/2026", "PLO"),
+        ("Projeto de Lei Nº 72/2025", "PLO"),
+        ("Projeto de Lei Complementar Nº 2/2024", "PLC"),
+        ("RU - Requerimento Urgência Nº 50/2026", "RU"),
+        ("REQ - Requerimento Nº 914/2026", "Req"),
+        ("EM-Emenda Nº 1/2026 ao PLC - Projeto de Lei Complementar Nº 20/2026", "Emen"),
+        ("Moção ao Aplauso Nº 3/2025", "MO"),
+        ("Ata Nº 1/2021", "ATA"),
+        ("TL - Tribuna Livre Nº 63/2026", None),
+    ],
+)
+def test_classifica_titulo_do_siscam(titulo, sigla):
+    assert base_mun.classificar_titulo(titulo)[0] == sigla
+
+
+def test_base_com_siscam(brutos):
+    raiz, especialistas = brutos
+    pasta = raiz / "raw" / "teste"
+    votacoes = [
+        {"id": 7, "titulo": "PLO - Projeto de Lei Ordinária Nº 1/2025", "id_sessao": 3,
+         "sessao": "Sessão Plenária Sessão Ordinária Nº 1/2025", "data": "2025-06-10",
+         "data_documento": "2025-06-01", "ementa": "Do prefeito", "tipo": "Nominal",
+         "autoria": "Poder Executivo, Prefeita", "resultado": "Aprovada",
+         "grupos": {"A Favor": [{"nome": "Bia"}, {"nome": "CRIS"}], "Contra": [{"nome": "Ana"}]}},
+        {"id": 8, "titulo": "RU - Requerimento Urgência Nº 2/2025", "id_sessao": 3,
+         "sessao": "x", "data": "2025-06-10", "data_documento": None, "ementa": None,
+         "tipo": "Nominal", "autoria": None, "resultado": None,
+         "grupos": {"A Favor": [{"nome": "Ana"}], "Não votaram": [{"nome": "Bia"}]}},
+    ]  # fmt: skip
+    frequencias = [
+        {"id": 1, "titulo": "Expediente", "id_sessao": 3,
+         "sessao": "Sessão Plenária Sessão Ordinária Nº 1/2025", "data": "2025-06-10",
+         "grupos": {"Presentes": [{"nome": "Ana"}], "Ausências Justificadas": [{"nome": "Bia"}]}},
+        {"id": 2, "titulo": "Ordem do Dia", "id_sessao": 3, "sessao": "x", "data": "2025-06-10",
+         "grupos": {"Presentes": [{"nome": "Ana"}, {"nome": "Bia"}]}},
+    ]  # fmt: skip
+    # registro repetido sob outro id: mesmo documento, sessão, dia e votos
+    votacoes.append({**votacoes[0], "id": 9})
+    # anterior à última votação do SAPL (10/05/2025): o período é do SAPL, fica de fora
+    votacoes.append({**votacoes[0], "id": 10, "data": "2025-05-01"})
+    _escrever(pasta, "siscam_votacoes", votacoes)
+    _escrever(pasta, "siscam_frequencias", frequencias)
+    municipio = Municipio(
+        "teste", "Teste", "SP", "https://sapl", MUNICIPIO.prefeitos, siscam="https://siscam"
+    )
+    destino = raiz / "siscam.duckdb"
+    base_mun.construir_base([municipio], destino, especialistas, raiz_brutos=raiz / "raw")
+    with duckdb.connect(str(destino)) as con:
+        assert con.execute(
+            """select id_votacao, legislatura, tipo, placar_sim, placar_nao, url
+               from votacao where id_votacao like 'siscam-%' order by 1"""
+        ).fetchall() == [
+            ("siscam-7", 12, "merito", 2, 1, "https://siscam/Siscam/Votacoes/Details?id=7"),
+            ("siscam-8", 12, "procedimento", 1, 0, "https://siscam/Siscam/Votacoes/Details?id=8"),
+        ]
+        # o período do SAPL continua vindo do SAPL
+        assert con.execute(
+            "select count(*) from votacao where id_votacao not like 'siscam-%'"
+        ).fetchone() == (4,)
+        # nome parlamentar ligado ao cadastro sem diferenciar maiúsculas e acentos
+        assert con.execute(
+            "select id_vereador, voto_codificado from voto where id_votacao = 'siscam-7' order by 1"
+        ).fetchall() == [("1", 0), ("2", 1), ("3", 1)]
+        assert con.execute(
+            "select do_executivo, sigla_tipo from materia where id_materia like 'PLO%'"
+        ).fetchall() == [(True, "PLO")]
+        assert con.execute(
+            "select id_vereador from presenca where id_sessao = 'siscam-3' order by 1"
+        ).fetchall() == [("1",), ("2",)]
+
+
+def test_base_com_siscam_recusa_vereador_fora_do_cadastro(brutos):
+    raiz, especialistas = brutos
+    pasta = raiz / "raw" / "teste"
+    _escrever(pasta, "siscam_votacoes", [
+        {"id": 7, "titulo": "Moção Nº 1/2025", "id_sessao": None, "sessao": None,
+         "data": "2025-06-10", "data_documento": None, "ementa": None, "tipo": "Nominal",
+         "autoria": None, "resultado": None, "grupos": {"A Favor": [{"nome": "Desconhecido"}]}},
+    ])  # fmt: skip
+    _escrever(pasta, "siscam_frequencias", [])
+    municipio = Municipio("teste", "Teste", "SP", "x", MUNICIPIO.prefeitos, siscam="y")
+    with pytest.raises(ValueError, match="Desconhecido"):
+        base_mun.construir_base(
+            [municipio], raiz / "s.duckdb", especialistas, raiz_brutos=raiz / "raw"
+        )

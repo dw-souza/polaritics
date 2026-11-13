@@ -193,9 +193,8 @@ def _carregar_posicao(con, m: Municipio, legislatura: int, variantes: list[str])
                 from uma_por_materia
             )
             select ?, ?, o.variante, o.id_vereador, o.ordem, o.id_votacao, v.data,
-                   mt.tipo || ' nº ' || mt.numero || ' de ' || mt.ano, mt.ementa, v.tipo,
-                   o.voto_original, v.placar_sim || ' × ' || v.placar_nao, o.peso,
-                   '{m.sapl}/materia/' || o.id_materia
+                   mt.titulo, mt.ementa, v.tipo,
+                   o.voto_original, v.placar_sim || ' × ' || v.placar_nao, o.peso, v.url
             from ordenado o
             join votacao v on v.municipio = ? and v.id_votacao = o.id_votacao
             left join materia mt on mt.municipio = v.municipio and mt.id_materia = o.id_materia

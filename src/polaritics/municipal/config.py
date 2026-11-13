@@ -20,6 +20,9 @@ class Municipio:
     uf: str
     sapl: str  # endereço público do SAPL, sem barra final
     prefeitos: tuple[Prefeito, ...]
+    # Câmaras que migraram para o Siscam: o SAPL vale até a sua última votação, e o Siscam
+    # complementa daí em diante (votações e frequências).
+    siscam: str | None = None
 
     @property
     def esfera(self) -> str:
@@ -40,6 +43,7 @@ MUNICIPIOS = {
             Prefeito("Alexandre Ferreira", "MDB", Periodo(date(2021, 1, 1), date(2024, 12, 31))),
             Prefeito("Alexandre Ferreira", "MDB", Periodo(date(2025, 1, 1), date(2028, 12, 31))),
         ),
+        siscam="https://www.franca.sp.leg.br",  # o SAPL parou de receber votações em mai/2026
     ),
 }
 

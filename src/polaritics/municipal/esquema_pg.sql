@@ -123,7 +123,7 @@ create table if not exists municipal.votacao_explicativa (
     voto            text not null,
     placar          text not null,         -- ex.: "12 × 2"
     peso            double precision not null,
-    url             text,                  -- página da matéria no SAPL
+    url             text,                  -- página oficial (SAPL ou Siscam)
     primary key (municipio, legislatura, variante, id_vereador, ordem)
 );
 

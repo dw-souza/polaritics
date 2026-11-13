@@ -1,6 +1,6 @@
 # Polaritics — Metodologia municipal (anexo)
 
-> **Status:** m0.1 (nov/2026). Anexo da [metodologia](metodologia.md) para câmaras municipais. Vale tudo o que está lá, **exceto** o que este documento muda. Cada resultado municipal publicado indica a versão deste anexo (`m0.1`) e a da metodologia geral.
+> **Status:** m0.2 (nov/2026). Anexo da [metodologia](metodologia.md) para câmaras municipais. Vale tudo o que está lá, **exceto** o que este documento muda. Cada resultado municipal publicado indica a versão deste anexo (ex.: `m0.2`) e a da metodologia geral.
 > Primeira câmara: **Franca-SP**.
 
 ## Por que um anexo
@@ -22,6 +22,10 @@ Também ficam de fora, por não terem sentido ou fonte no município: a visão "
 - Cada arquivo baixado é registrado num manifesto com o hash SHA-256, como na Câmara.
 - **Conferência:** o placar oficial de cada registro de votação tem de bater com a soma dos votos individuais. Em Franca bate em 3.603 de 3.604 registros. As divergências são listadas no relatório de validação.
 - O SAPL é usado por centenas de câmaras municipais. Outra câmara entra pela configuração, sem mudar o código, desde que publique os votos individuais.
+- **Siscam** (Sino Informática), para câmaras que migraram para ele. Franca passou a registrar as sessões no Siscam em maio de 2026, e o SAPL deixou de receber votações depois de 22/05/2026. **Cada período vem do sistema em que foi registrado:** o SAPL até a sua última votação, e o Siscam a partir do dia seguinte, para votações e presença. O cadastro (vereadores, mandatos, filiações, fotos) continua vindo do SAPL.
+- **Por que não usar o histórico do Siscam:** ele também traz as votações de 2021 a maio de 2026, migradas do SAPL, mas com erros. Em 272 delas (22 com divergência), a votação aparece ligada a uma sessão anterior à data do próprio documento. Exemplo: o PL 226/2025, de dezembro de 2025, aparece votado na 3ª sessão ordinária de janeiro de 2025. Nenhum caso assim ocorre nos registros feitos diretamente no Siscam.
+- **Coleta do Siscam:** não há API, e a exportação em CSV devolve erro. A coleta lê a listagem pública das votações nominais, que já traz os votos agrupados ("A Favor", "Contra", "Abstenções", "Não votaram"), e confere a contagem de cada grupo com a lista de nomes e o total de registros informado pela página.
+- **Ligação entre as fontes:** o Siscam identifica o vereador por "Nome civil (Nome parlamentar)". O nome parlamentar é ligado ao cadastro do SAPL sem diferenciar maiúsculas nem acentos. Um nome sem correspondência interrompe a construção da base.
 
 ## M2. Unidade e período
 
@@ -34,7 +38,8 @@ Também ficam de fora, por não terem sentido ou fonte no município: a visão "
 
 Entram:
 - Todos os registros de votação com voto individual registrado (votações nominais em sessão plenária), **inclusive moções** *(decisão M-D2)*.
-- Como na Câmara, ficam de fora as votações quase unânimes (minoria < 2,5%). Com 15 vereadores, isso quer dizer: entra toda votação com ao menos um voto divergente.
+- Como na Câmara, ficam de fora as votações quase unânimes (minoria < 2,5%).
+- Também como na Câmara, ficam de fora os registros duplicados da mesma votação. O Siscam de Franca repete algumas votações com ids diferentes e o mesmo documento, sessão, dia e votos. Fica só o primeiro registro. O SAPL não tem esse problema. Com 15 vereadores, isso quer dizer: entra toda votação com ao menos um voto divergente.
 
 **Por que as moções entram:** em Franca, moções de apoio, repúdio e aplauso estão entre as votações que mais separam os vereadores. Exemplos: anistia aos condenados do 8 de janeiro, aplausos a deputados federais, repúdio a medidas do governo federal. Muitas tratam de **política nacional**, e não da cidade. Isso é declarado na página: a posição municipal mede como o vereador vota, inclusive quando a câmara se manifesta sobre temas nacionais.
 
@@ -87,7 +92,7 @@ A faixa e a zona de fronteira (4.3 e 4.3.1) continuam valendo, com o mesmo boots
 
 ## M6. Presença
 
-- Sessões plenárias ordinárias e extraordinárias encerradas e com lista de presença registrada no SAPL. Sessões sem nenhuma presença registrada ficam fora, porque a falta da lista não é falta do vereador.
+- Sessões plenárias ordinárias e extraordinárias encerradas e com lista de presença registrada. No Siscam, que faz uma chamada no Expediente e outra na Ordem do Dia, está presente na sessão quem consta como presente em ao menos uma delas. Sessões sem nenhuma presença registrada ficam fora, porque a falta da lista não é falta do vereador.
 - **Presença** = sessões com presença ÷ sessões realizadas durante o mandato do vereador na legislatura. Entra no cálculo quem tiver ≥ 20 sessões no período.
 - Atividade legislativa e gastos ficam para uma versão futura. O SAPL não traz gastos, e a situação das matérias segue convenções próprias de cada câmara.
 
@@ -125,9 +130,11 @@ A faixa e a zona de fronteira (4.3 e 4.3.1) continuam valendo, com o mesmo boots
 | M-D4 | Posição na câmara e grupos de votação ao lado da faixa (M4.2) | m0.1 |
 | M-D5 | Governismo pelas matérias do Executivo (M5) | m0.1 |
 | M-D6 | Validação própria, sem a ordem dos partidos (M7) | m0.1 |
+| M-D7 | Câmara que migrou para o Siscam: cada período vem do sistema em que foi registrado (SAPL até a sua última votação, Siscam depois) (M1) | m0.2 |
 
 ## Histórico
 
 | Versão | Data | Mudanças |
 |---|---|---|
 | m0.1 | 13/11/2026 | Primeira versão, com Franca-SP. |
+| m0.2 | 13/11/2026 | Siscam como fonte depois da última votação do SAPL (M-D7). Nenhum critério mudou. Com os dados de maio a novembro de 2026, a 12ª legislatura de Franca passou de 62 para 74 votações informativas e passou a atender ao critério de estabilidade nas duas variantes (100% com todas as votações e 93,3% só com mérito; com o SAPL até maio, eram 80% e 80%). |

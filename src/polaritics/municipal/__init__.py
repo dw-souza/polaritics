@@ -5,4 +5,4 @@ governismo e a validação, que dependem de dados que o município não tem.
 """
 
 # Versão do anexo municipal da metodologia. Todo resultado municipal carrega este valor.
-METODOLOGIA_MUNICIPAL_VERSAO = "m0.1"
+METODOLOGIA_MUNICIPAL_VERSAO = "m0.2"

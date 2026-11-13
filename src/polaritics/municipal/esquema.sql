@@ -55,6 +55,7 @@ create table filiacao (
 create table materia (
     municipio       varchar not null,
     id_materia      varchar not null,
+    titulo          varchar,                       -- ex.: "Moção de Apoio nº 6 de 2025"
     sigla_tipo      varchar,
     tipo            varchar,
     numero          integer,
@@ -74,6 +75,7 @@ create table votacao (
     placar_nao      integer,
     tipo            varchar not null,              -- merito | procedimento
     eh_mocao        boolean not null,
+    url             varchar,                       -- página oficial da votação ou da matéria
     primary key (municipio, id_votacao)
 );
 

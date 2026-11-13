@@ -98,7 +98,7 @@ async function Camara({ params, searchParams }: PageProps<"/camaras/[municipio]"
         <Fatos leg={leg} unanimes={unanimes} grupos={grupos} n={comPosicao.length} />
         {leg.dados_ate && leg.em_curso && (leg.dias_sem_dados ?? 0) > DIAS_SEM_DADOS && (
           <p className="aviso" style={{ marginTop: 16 }}>
-            <strong>Dados parados.</strong> A câmara não registra votações no seu sistema (SAPL)
+            <strong>Dados parados.</strong> A câmara não registra votações no seu sistema
             desde {formatarData(leg.dados_ate)}. Os números refletem só o que foi publicado até
             essa data.
           </p>

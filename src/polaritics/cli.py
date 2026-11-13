@@ -20,6 +20,7 @@ from polaritics.municipal import pipeline
 from polaritics.municipal import publicar as publicar_municipal
 from polaritics.municipal.coleta import ColetorSAPL
 from polaritics.municipal.config import MUNICIPIOS
+from polaritics.municipal.siscam import ColetorSiscam
 from polaritics.publicar import neon
 from polaritics.validacao import relatorio
 
@@ -104,10 +105,13 @@ def municipal_coletar(args: argparse.Namespace) -> None:
     if not especialistas.ARQUIVO.exists():
         especialistas.baixar()
     for slug in args.municipio:
-        contagem = ColetorSAPL(MUNICIPIOS[slug]).coletar()
-        print(
-            f"{slug}: {contagem['votoparlamentar']} votos, {contagem['registrovotacao']} votações"
-        )
+        m = MUNICIPIOS[slug]
+        contagem = ColetorSAPL(m).coletar()
+        votos, votacoes = contagem["votoparlamentar"], contagem["registrovotacao"]
+        print(f"{slug}: SAPL com {votos} votos em {votacoes} votações")
+        if m.siscam:
+            contagem = ColetorSiscam(m.siscam, m.dir_brutos).coletar()
+            print(f"{slug}: Siscam com {contagem['votacoes']} votações nominais")
 
 
 def municipal_calcular(args: argparse.Namespace) -> None:

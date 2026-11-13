@@ -261,14 +261,15 @@ def conferencia_placar(con, municipio) -> Resultado:
         float(len(divergentes)),
         "acompanhado",
         "informativo",
-        f"{len(divergentes)} de {total} registros com placar diferente da soma dos votos."
+        f"{len(divergentes)} de {total} registros com placar diferente da soma dos votos. "
+        "No Siscam, a contagem de cada grupo é conferida com a lista de nomes já na coleta."
         + (f" {exemplos}." if exemplos else ""),
         obrigatorio=False,
     )
 
 
 def atualidade(con, municipio, legislatura) -> Resultado:
-    """Última votação registrada no SAPL: câmaras às vezes param de lançar as sessões."""
+    """Última votação registrada: câmaras param de lançar as sessões ou trocam de sistema."""
     ultima, dias = con.execute(
         """select max(data), current_date - max(data) from votacao_valida
            where municipio = ? and legislatura = ?""",
@@ -280,7 +281,7 @@ def atualidade(con, municipio, legislatura) -> Resultado:
         float(dias),
         "acompanhado",
         "informativo",
-        f"Última votação registrada no SAPL em {ultima:%d/%m/%Y}.",
+        f"Última votação registrada no sistema da câmara em {ultima:%d/%m/%Y}.",
         obrigatorio=False,
     )
 
