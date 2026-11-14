@@ -58,6 +58,9 @@ export type LinhaVereador = {
   gov_n: number | null;
   gov_suficiente: boolean;
   presenca: number | null;
+  aprovados: number | null;
+  viagens: number | null;
+  custo_atribuido: number | null;
 };
 
 export type Vereador = {
@@ -152,13 +155,18 @@ export async function vereadoresDaLegislatura(
       select m.id_vereador, v.nome, v.foto_url, m.partido, m.n_votos,
              g.taxa_disputadas as gov_taxa, g.alinhados_disputadas as gov_alinhados,
              g.n_disputadas as gov_n, coalesce(g.suficiente, false) as gov_suficiente,
-             case when pr.suficiente then pr.taxa end as presenca
+             case when pr.suficiente then pr.taxa end as presenca,
+             at.aprovados, vg.viagens, vg.custo_atribuido
       from municipal.mandato m
       join municipal.vereador v using (municipio, id_vereador)
       left join municipal.governismo g on g.municipio = m.municipio
            and g.legislatura = m.legislatura and g.id_vereador = m.id_vereador
       left join municipal.presenca pr on pr.municipio = m.municipio
            and pr.legislatura = m.legislatura and pr.id_vereador = m.id_vereador
+      left join municipal.atividade at on at.municipio = m.municipio
+           and at.legislatura = m.legislatura and at.id_vereador = m.id_vereador
+      left join municipal.viagens vg on vg.municipio = m.municipio
+           and vg.legislatura = m.legislatura and vg.id_vereador = m.id_vereador
       where m.municipio = ${slug} and m.legislatura = ${legislatura}
       order by v.nome`,
     sql`
@@ -295,3 +303,124 @@ export function hrefVereador(
   const s = q.toString();
   return s ? `/camaras/${slug}/vereador/${id}?${s}` : `/camaras/${slug}/vereador/${id}`;
 }
+
+export type Atividade = {
+  apresentados: number;
+  aprovados: number;
+  aprovados_denominacao: number;
+  projetos: { titulo: string; ementa: string | null; data: string | null; url: string | null }[];
+};
+
+export type Viagem = {
+  numero: number;
+  ano: number;
+  data: string | null;
+  ementa: string | null;
+  custo: number;
+  n_vereadores: number;
+  url: string | null;
+};
+
+export type Viagens = {
+  viagens: number;
+  custo_atribuido: number;
+  custo_das_viagens: number;
+  lista: Viagem[];
+};
+
+export type Campanha = {
+  ano_eleicao: number;
+  partido: string | null;
+  situacao: string | null;
+  receita: number;
+  fundo_especial: number;
+  fundo_partidario: number;
+  proprios: number;
+  pessoas_fisicas: number;
+  outros: number;
+  despesa: number;
+};
+
+export type Estrutura = {
+  ano: number;
+  mes: number;
+  vereadores: number;
+  subsidio: number | null;
+  assessores: number;
+  custo_assessores: number | null;
+  viagens_por_ano: { ano: number; total: number; com_vereador: number; sem_piv: number }[];
+};
+
+// Projetos como primeiro autor (M9); a lista traz os aprovados que não são só denominações.
+export async function atividade(slug: string, id: string, legislatura: number): Promise<Atividade | null> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("municipal");
+  const [[linha], projetos] = await Promise.all([
+    sql`select apresentados, aprovados, aprovados_denominacao from municipal.atividade
+        where municipio = ${slug} and id_vereador = ${id} and legislatura = ${legislatura}`,
+    sql`select titulo, ementa, data::text as data, url from municipal.projeto_aprovado
+        where municipio = ${slug} and id_vereador = ${id} and legislatura = ${legislatura}
+          and not denominacao
+        order by data desc`,
+  ]);
+  if (!linha) return null;
+  return { ...(linha as Omit<Atividade, "projetos">), projetos: projetos as Atividade["projetos"] };
+}
+
+export async function viagens(slug: string, id: string, legislatura: number): Promise<Viagens | null> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("municipal");
+  const [[linha], lista] = await Promise.all([
+    sql`select viagens, custo_atribuido, custo_das_viagens from municipal.viagens
+        where municipio = ${slug} and id_vereador = ${id} and legislatura = ${legislatura}`,
+    sql`select v.numero, v.ano, v.data::text as data, v.ementa, v.custo, v.n_vereadores, v.url
+        from municipal.viagem v
+        join municipal.viagem_vereador vv using (municipio, numero, ano)
+        where v.municipio = ${slug} and vv.id_vereador = ${id} and v.legislatura = ${legislatura}
+        order by v.custo desc`,
+  ]);
+  if (!linha) return null;
+  return { ...(linha as Omit<Viagens, "lista">), lista: lista as Viagem[] };
+}
+
+export async function campanha(slug: string, id: string, legislatura: number): Promise<Campanha | null> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("municipal");
+  const [linha] = await sql`
+    select ano_eleicao, partido, situacao, receita, fundo_especial, fundo_partidario, proprios,
+           pessoas_fisicas, outros, despesa
+    from municipal.campanha
+    where municipio = ${slug} and id_vereador = ${id} and legislatura = ${legislatura}`;
+  return (linha as Campanha) ?? null;
+}
+
+// Retrato da câmara (M11): o mês mais recente da folha e o gasto com viagens por ano.
+export async function estrutura(slug: string): Promise<Estrutura | null> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("municipal");
+  const [[folha], porAno] = await Promise.all([
+    sql`select ano, mes, vereadores, subsidio, assessores, custo_assessores
+        from municipal.folha_mes where municipio = ${slug} and vereadores > 0
+        order by ano desc, mes desc limit 1`,
+    sql`select ano, total, com_vereador, sem_piv from municipal.viagem_ano
+        where municipio = ${slug} order by ano`,
+  ]);
+  if (!folha) return null;
+  return {
+    ...(folha as Omit<Estrutura, "viagens_por_ano">),
+    viagens_por_ano: porAno as Estrutura["viagens_por_ano"],
+  };
+}
+
+// Situação na eleição como o TSE registra, em texto corrido.
+const SITUACOES: Record<string, string> = {
+  "ELEITO POR QP": "eleito pelo quociente partidário",
+  "ELEITO POR MÉDIA": "eleito pela média",
+  SUPLENTE: "suplente",
+  "NÃO ELEITO": "não eleito",
+};
+export const situacaoEleitoral = (s: string | null) => (s ? (SITUACOES[s] ?? s.toLowerCase()) : "");

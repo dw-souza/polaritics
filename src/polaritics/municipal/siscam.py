@@ -1,4 +1,5 @@
-"""Coleta das votações no Siscam (Sino Informática), sistema que substituiu o SAPL em Franca.
+"""Coleta do Siscam (Sino Informática), sistema que substituiu o SAPL em Franca: votações,
+frequências e documentos (projetos e processos de viagem).
 
 A base usa o Siscam só depois da última votação do SAPL: o histórico migrado para o Siscam tem
 votações ligadas a sessões erradas (metodologia municipal, M1). A coleta, porém, baixa tudo,
@@ -27,7 +28,11 @@ from polaritics.coleta.camara import RegistroArquivo
 
 log = logging.getLogger(__name__)
 
-TIPO_VOTACAO_NOMINAL = 1
+# Documentos: grupo 3 = proposituras (PLO 35, PLC 36, PDL 37, PR 38, PELO 39);
+# grupo 1 = documentos administrativos (PIV, Procedimento Interno de Viagem = 71).
+FILTRO_PROJETOS = {"Pesquisa": "Avancada", "GrupoId": 3, "TipoId": [35, 36, 37, 38, 39]}
+FILTRO_PIV = {"Pesquisa": "Avancada", "GrupoId": 1, "TipoId": [71]}
+ANO_INICIAL_DOCUMENTOS = 2021
 POR_PAGINA = 100
 TENTATIVAS = 4
 ESPERA_BASE_S = 2.0
@@ -45,7 +50,8 @@ def _texto(fragmento: str) -> str:
 def _campo(item: str, rotulo: str) -> list[str]:
     """Valores dos campos "<strong>Rótulo:</strong> valor" do item, na ordem da página."""
     padrao = rf"<strong>\s*{rotulo}:\s*</strong>(.*?)</p>"
-    return [_texto(v) for v in re.findall(padrao, item, flags=re.S)]
+    # rótulos acentuados vêm como entidades ("Situa&#xE7;&#xE3;o"); as tags não mudam
+    return [_texto(v) for v in re.findall(padrao, html.unescape(item), flags=re.S)]
 
 
 def _data(texto: str) -> str | None:
@@ -81,19 +87,35 @@ def _grupos(item: str, rotulo_item: str) -> dict[str, list[dict]]:
 
 
 def interpretar_listagem(pagina: str, recurso: str = "Votacoes") -> tuple[list[dict], int]:
-    """Registros de uma página da listagem (`Votacoes` ou `Frequencias`) e o total informado."""
+    """Registros de uma página da listagem (`Votacoes`, `Frequencias` ou `Documentos`) e o total
+    informado pela página."""
     total = re.search(r"([\d.]+)\s+registros?\s+encontrados?", pagina)
     if not total:
         raise ErroColetaSiscam("a página não informa o total de registros")
     registros = []
     for item in pagina.split('class="data-list-item"')[1:]:
         titulo = re.search(
-            rf'<h4>\s*<a href="/Siscam/{recurso}/Details\?id=(\d+)">(.*?)</a>', item, re.S
+            rf'<h4[^>]*>\s*<a href="/Siscam/{recurso}/Details\?id=(\d+)[^"]*">(.*?)</a>', item, re.S
         )
         if not titulo:
             raise ErroColetaSiscam(f"item sem link para /Siscam/{recurso}")
         sessao = re.search(r'Reunioes/Details\?id=(\d+)">(.*?)</a>', item, re.S)
         datas = [_data(d) for d in _campo(item, "Data")]
+        if recurso == "Documentos":
+            registros.append(
+                {
+                    "id": int(titulo[1]),
+                    "titulo": _texto(titulo[2]),
+                    "data": datas[0] if datas else None,
+                    "situacao": next(iter(_campo(item, "Situação")), None),
+                    "ementa": next(iter(_campo(item, "Ementa")), None),
+                    "observacoes": next(iter(_campo(item, "Observações")), None),
+                    # "Nome Civil (Nome Parlamentar)" para vereadores; servidores, comissões e o
+                    # Executivo aparecem sem parênteses
+                    "autoria": next(iter(_campo(item, "Autoria") + _campo(item, "Autor")), None),
+                }
+            )
+            continue
         registro = {
             "id": int(titulo[1]),
             "titulo": _texto(titulo[2]),
@@ -120,19 +142,34 @@ class ColetorSiscam:
         self.url_base = url_base.rstrip("/")
         self.destino = destino
         self.cliente = cliente or httpx.Client(timeout=120, follow_redirects=True)
-        self.caminho_manifesto = destino / "manifesto.json"
 
     def coletar(self) -> dict[str, int]:
         """Votações nominais e frequências das sessões, cada uma num JSON."""
         self.destino.mkdir(parents=True, exist_ok=True)
         return {
-            "votacoes": self._listar(
-                "Votacoes", {"TipoVotacaoId": TIPO_VOTACAO_NOMINAL}, "siscam_votacoes.json"
-            ),
+            # todos os tipos: as simbólicas não têm votos individuais, mas dizem se um projeto
+            # foi aprovado (atividade legislativa); a base usa só as nominais para a posição
+            "votacoes": self._listar("Votacoes", {}, "siscam_votacoes.json"),
             "frequencias": self._listar("Frequencias", {}, "siscam_frequencias.json"),
+            "projetos": self._listar_por_ano(FILTRO_PROJETOS, "siscam_projetos.json"),
+            "piv": self._listar_por_ano(FILTRO_PIV, "siscam_piv.json"),
         }
 
+    def _listar_por_ano(self, filtros: dict, arquivo: str) -> int:
+        """Documentos de cada ano desde 2021 (a listagem completa traz décadas de histórico)."""
+        registros = []
+        for ano in range(ANO_INICIAL_DOCUMENTOS, datetime.now(UTC).year + 1):
+            registros += self._coletar_listagem("Documentos", {**filtros, "Ano": ano})
+        registros.sort(key=lambda r: r["id"])
+        self._gravar(arquivo, self._url("Documentos"), registros)
+        return len(registros)
+
     def _listar(self, recurso: str, filtros: dict, arquivo: str) -> int:
+        registros = self._coletar_listagem(recurso, filtros)
+        self._gravar(arquivo, self._url(recurso), sorted(registros, key=lambda r: r["id"]))
+        return len(registros)
+
+    def _coletar_listagem(self, recurso: str, filtros: dict) -> list[dict]:
         registros, total = self._pagina(recurso, filtros, 1)
         paginas = -(-total // POR_PAGINA)
         for p in range(2, paginas + 1):
@@ -146,9 +183,7 @@ class ColetorSiscam:
                 f"{recurso}: {len(set(ids))} registros distintos em {len(ids)}; o Siscam informa "
                 f"{total} (a listagem mudou durante a coleta?)"
             )
-        registros.sort(key=lambda r: r["id"])
-        self._gravar(arquivo, self._url(recurso), registros)
-        return total
+        return registros
 
     def _url(self, recurso: str) -> str:
         return f"{self.url_base}/Siscam/{recurso}"
@@ -167,26 +202,33 @@ class ColetorSiscam:
         raise AssertionError("inalcançável")
 
     def _gravar(self, nome: str, url: str, registros: list[dict]) -> None:
-        conteudo = json.dumps(registros, ensure_ascii=False, sort_keys=True).encode()
-        sha256 = hashlib.sha256(conteudo).hexdigest()
-        (self.destino / nome).write_bytes(conteudo)
-        manifesto = (
-            json.loads(self.caminho_manifesto.read_text(encoding="utf-8"))
-            if self.caminho_manifesto.exists()
-            else {}
+        gravar_com_manifesto(self.destino, nome, url, registros)
+
+
+def gravar_com_manifesto(destino: Path, nome: str, url: str, registros: list[dict]) -> None:
+    """Grava os registros em JSON e anota no manifesto o SHA-256 e quando o conteúdo mudou."""
+    destino.mkdir(parents=True, exist_ok=True)
+    conteudo = json.dumps(registros, ensure_ascii=False, sort_keys=True).encode()
+    sha256 = hashlib.sha256(conteudo).hexdigest()
+    (destino / nome).write_bytes(conteudo)
+    caminho_manifesto = destino / "manifesto.json"
+    manifesto = (
+        json.loads(caminho_manifesto.read_text(encoding="utf-8"))
+        if caminho_manifesto.exists()
+        else {}
+    )
+    anterior = manifesto.get(nome)
+    agora = datetime.now(UTC).isoformat(timespec="seconds")
+    mudou = anterior is None or anterior["sha256"] != sha256
+    manifesto[nome] = asdict(
+        RegistroArquivo(
+            url=url,
+            sha256=sha256,
+            bytes=len(conteudo),
+            baixado_em=agora,
+            alterado_em=agora if mudou else anterior["alterado_em"],
         )
-        anterior = manifesto.get(nome)
-        agora = datetime.now(UTC).isoformat(timespec="seconds")
-        mudou = anterior is None or anterior["sha256"] != sha256
-        manifesto[nome] = asdict(
-            RegistroArquivo(
-                url=url,
-                sha256=sha256,
-                bytes=len(conteudo),
-                baixado_em=agora,
-                alterado_em=agora if mudou else anterior["alterado_em"],
-            )
-        )
-        self.caminho_manifesto.write_text(
-            json.dumps(dict(sorted(manifesto.items())), indent=2) + "\n", encoding="utf-8"
-        )
+    )
+    caminho_manifesto.write_text(
+        json.dumps(dict(sorted(manifesto.items())), indent=2) + "\n", encoding="utf-8"
+    )

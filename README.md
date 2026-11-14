@@ -36,10 +36,10 @@ A validação com a Pesquisa Legislativa Brasileira usa um arquivo baixado manua
 
 ### Câmaras municipais
 
-Os dados vêm da API do SAPL (Interlegis) de cada câmara, configurada em `src/polaritics/municipal/config.py`. Câmaras que migraram para o Siscam (caso de Franca) usam o SAPL até a sua última votação e, depois dela, as votações e a presença lidas das páginas públicas do Siscam. Como o modelo de uma câmara pequena roda em segundos, `calcular` recria a base e os resultados juntos, em `data/processed/municipal.duckdb`.
+Os dados vêm da API do SAPL (Interlegis) de cada câmara, configurada em `src/polaritics/municipal/config.py`. Câmaras que migraram para o Siscam (caso de Franca) usam o SAPL até a sua última votação e, depois dela, as votações e a presença lidas das páginas públicas do Siscam. Para Franca também entram a atividade legislativa (projetos do Siscam), as viagens oficiais e a folha da Câmara (Portal da Transparência, sistema EddyData) e a prestação de contas de campanha (TSE, lida por faixas dos pacotes de dados abertos, sem baixá-los inteiros). Como o modelo de uma câmara pequena roda em segundos, `calcular` recria a base e os resultados juntos, em `data/processed/municipal.duckdb`.
 
 ```bash
-uv run polaritics municipal coletar     # SAPL e Siscam (~4 min em Franca; ~45 min na primeira vez ou com --forcar)
+uv run polaritics municipal coletar     # SAPL, Siscam, EddyData e TSE (~10 min em Franca; ~1 h na primeira vez ou com --forcar)
 uv run polaritics municipal calcular    # base, posição, governismo, presença e validação (~1 min)
 uv run polaritics municipal publicar    # carrega no Postgres, schema `municipal`
 ```

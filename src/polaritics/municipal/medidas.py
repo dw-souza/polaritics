@@ -1,4 +1,5 @@
-"""Governismo (M5) e presença (M6) numa câmara municipal."""
+"""Governismo (M5), presença (M6), atividade legislativa (M9), viagens (M10) e folha (M11)
+numa câmara municipal."""
 
 import duckdb
 
@@ -64,5 +65,65 @@ def calcular_presenca(con: duckdb.DuckDBPyConnection) -> None:
         left join (select distinct * from presenca) p
                on p.municipio = r.municipio and p.id_sessao = r.id_sessao
               and p.id_vereador = m.id_vereador
+        group by all
+    """)
+
+
+def calcular_atividade(con: duckdb.DuckDBPyConnection) -> None:
+    """Projetos apresentados como primeiro autor na legislatura, aprovados e, entre os
+    aprovados, os que só dão nome a vias e próprios públicos."""
+    con.execute("""
+        create or replace table atividade as
+        select p.municipio, p.id_vereador, l.numero as legislatura,
+               count(*) as apresentados,
+               count(*) filter (p.aprovado) as aprovados,
+               count(*) filter (p.aprovado and p.denominacao) as aprovados_denominacao
+        from projeto p
+        join legislatura l on l.municipio = p.municipio and p.data between l.inicio and l.fim
+        where p.id_vereador is not null
+        group by all
+    """)
+
+
+def calcular_viagens(con: duckdb.DuckDBPyConnection) -> None:
+    """Custo líquido de cada viagem (empenhos menos anulações) e, por vereador, as viagens de que
+    participou. O custo da viagem inclui assessores e motoristas e é dividido igualmente entre
+    os vereadores que viajaram."""
+    con.execute("""
+        create or replace table viagem_custo as
+        select v.municipio, v.numero, v.ano, v.data, v.ementa, v.url, l.numero as legislatura,
+               coalesce(sum(d.valor), 0) as custo,
+               count(d.id_empenho) filter (d.especie = 'EMO') as empenhos,
+               (select count(*) from viagem_vereador vv where vv.municipio = v.municipio
+                and vv.numero = v.numero and vv.ano = v.ano) as n_vereadores
+        from viagem v
+        left join legislatura l on l.municipio = v.municipio and v.data between l.inicio and l.fim
+        left join despesa_viagem d on d.municipio = v.municipio and d.piv_numero = v.numero
+             and d.piv_ano = v.ano
+        group by all
+    """)
+    con.execute("""
+        create or replace table viagens as
+        select vv.municipio, vv.id_vereador, c.legislatura,
+               count(*) as viagens,
+               sum(c.custo / c.n_vereadores) as custo_atribuido,
+               sum(c.custo) as custo_das_viagens
+        from viagem_vereador vv
+        join viagem_custo c using (municipio, numero, ano)
+        where c.legislatura is not null
+        group by all
+    """)
+
+
+def calcular_folha(con: duckdb.DuckDBPyConnection) -> None:
+    """Por mês: subsídio dos vereadores e número e custo bruto dos assessores parlamentares."""
+    con.execute("""
+        create or replace table folha_mes as
+        select municipio, ano, mes,
+               count(distinct nome) filter (cargo = 'VEREADOR') as vereadores,
+               median(valor_bruto) filter (cargo = 'VEREADOR' and calculo = 'FOLHA') as subsidio,
+               count(distinct nome) filter (cargo like 'ASSESSOR%') as assessores,
+               sum(valor_bruto) filter (cargo like 'ASSESSOR%') as custo_assessores
+        from folha
         group by all
     """)

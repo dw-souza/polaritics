@@ -33,6 +33,7 @@ ENDPOINTS = {
     "tipomateria": "materia/tipomaterialegislativa",
     "materia": "materia/materialegislativa",
     "tiposessao": "sessao/tiposessaoplenaria",
+    "tiporesultado": "sessao/tiporesultadovotacao",
     "sessao": "sessao/sessaoplenaria",
     "presenca": "sessao/sessaoplenariapresenca",
     "registrovotacao": "sessao/registrovotacao",

@@ -1,6 +1,6 @@
 # Polaritics — Metodologia municipal (anexo)
 
-> **Status:** m0.2 (nov/2026). Anexo da [metodologia](metodologia.md) para câmaras municipais. Vale tudo o que está lá, **exceto** o que este documento muda. Cada resultado municipal publicado indica a versão deste anexo (ex.: `m0.2`) e a da metodologia geral.
+> **Status:** m0.3 (nov/2026). Anexo da [metodologia](metodologia.md) para câmaras municipais. Vale tudo o que está lá, **exceto** o que este documento muda. Cada resultado municipal publicado indica a versão deste anexo (ex.: `m0.2`) e a da metodologia geral.
 > Primeira câmara: **Franca-SP**.
 
 ## Por que um anexo
@@ -94,7 +94,6 @@ A faixa e a zona de fronteira (4.3 e 4.3.1) continuam valendo, com o mesmo boots
 
 - Sessões plenárias ordinárias e extraordinárias encerradas e com lista de presença registrada. No Siscam, que faz uma chamada no Expediente e outra na Ordem do Dia, está presente na sessão quem consta como presente em ao menos uma delas. Sessões sem nenhuma presença registrada ficam fora, porque a falta da lista não é falta do vereador.
 - **Presença** = sessões com presença ÷ sessões realizadas durante o mandato do vereador na legislatura. Entra no cálculo quem tiver ≥ 20 sessões no período.
-- Atividade legislativa e gastos ficam para uma versão futura. O SAPL não traz gastos, e a situação das matérias segue convenções próprias de cada câmara.
 
 ## M7. Validação (critério para publicar)
 
@@ -118,7 +117,34 @@ A faixa e a zona de fronteira (4.3 e 4.3.1) continuam valendo, com o mesmo boots
 - **Quase tudo é unânime.** Em Franca, cerca de 97% das votações nominais não têm voto contrário. A posição se apoia em poucas dezenas de votações por legislatura, contra mais de mil na Câmara.
 - A pauta, inclusive a das moções, é definida pela própria câmara. Temas que não chegam a voto nominal não entram.
 - Os partidos têm pouca identidade no nível municipal, e as trocas na janela de 2024 foram muitas. A nota do partido é contexto, não verdade.
-- Votações simbólicas e o trabalho nas comissões não aparecem.
+- Votações simbólicas não entram na posição (só servem para saber se um projeto foi aprovado, M9), e o trabalho nas comissões não aparece.
+
+## M9. Atividade legislativa *(decisão M-D8)*
+
+- **O que conta:** projetos de lei ordinária e complementar, de emenda à Lei Orgânica, de decreto legislativo e de resolução, apresentados na legislatura com o vereador como **primeiro autor**. É a mesma regra dos deputados (seção 11.4 da metodologia geral).
+- **Fonte:** a lista de documentos do Siscam, desde 2021. Ao contrário das votações, a lista de projetos migrada para o Siscam é confiável: o número de projetos por ano bate com o do SAPL (2021 a 2025, com diferença de 2 projetos em 2023). E só o Siscam continua sendo atualizado.
+- **Aprovado:** projeto com ao menos uma votação em plenário, nominal ou simbólica, cujo resultado foi de aprovação. A situação de tramitação do Siscam não serve, porque aparece em menos de 10% dos projetos. Conferência: no período em que existem os dois sistemas, o resultado bate com as votações do SAPL em 804 de 805 projetos da 11ª legislatura.
+- **Denominações à parte:** projetos cuja ementa só dá nome a rua ou próprio público ("Denomina…") são mostrados separadamente entre os aprovados. Na 11ª legislatura de Franca, foram 22% dos aprovados.
+- **Ficam de fora** indicações, requerimentos e moções. São milhares por ano, quantidade não é qualidade, e o campo de autor das indicações no Siscam às vezes traz quem as cadastrou, não quem as assina.
+
+## M10. Viagens oficiais *(decisão M-D9)*
+
+- **Custo:** empenhos de diárias (elemento 3.3.90.14) e de passagens e locomoção (3.3.90.33) da Câmara no Portal da Transparência do município (EddyData), menos as anulações de cada empenho. Cada empenho cita no histórico o processo de viagem ("PIV nº/ano"), e o custo de uma viagem é a soma dos empenhos do seu PIV. Inclui diárias e despesas de assessores e motoristas.
+- **Quem viajou:** o processo de viagem (PIV) no Siscam. Os vereadores são identificados por três sinais: (1) a autoria completa do PIV ("Nome civil (Nome parlamentar)"); (2) os apelidos na ementa, cortada antes da lista de acompanhantes (assessores, servidores, motoristas), e só os apelidos que apontam para um único vereador da legislatura ("Bassi", "Tidy"; "Donizete" não, porque é também nome do meio de outro vereador); (3) o nome civil depois de "VER." no histórico dos empenhos.
+- **Por vereador:** número de viagens e o custo delas **dividido igualmente entre os vereadores que viajaram juntos**. A página mostra também o custo total das viagens de que o vereador participou e a lista de viagens, com o destino e o motivo, e link para o processo.
+- **Cobertura, publicada no relatório de validação:** na 11ª legislatura, 70% do gasto com viagens que têm PIV tem ao menos um vereador identificado; na 12ª, 94%. O restante são viagens só de servidores (ex.: o ouvidor) ou PIVs cuja ementa não traz os nomes. Empenhos sem PIV (como o pedágio eletrônico da frota) não entram na conta por vereador.
+
+## M11. Estrutura da câmara: subsídio e assessores *(decisão M-D10)*
+
+- **Fonte:** folha de pagamento da Câmara no EddyData, mês a mês.
+- **O que é publicado:** só agregados da câmara: o subsídio dos vereadores, o número de assessores parlamentares e o custo bruto deles por mês.
+- **Por que não "o gabinete de cada vereador":** a folha não informa o gabinete do assessor (todos estão no departamento "ASSESSORES"). A única ligação são os avisos de nomeação da câmara, que são incompletos (a nomeação em lote de 2025, por exemplo, não diz o gabinete) e não registram exonerações. Publicar a equipe de cada gabinete com esses dados daria números errados. Como cada vereador tem direito ao mesmo número de assessores (dois, desde 2025), com o mesmo salário, o custo do gabinete também não diferencia os vereadores.
+
+## M12. Campanha eleitoral *(decisão M-D11)*
+
+- **Fonte:** dados abertos do TSE (candidaturas e prestação de contas de candidatos), eleições de 2020 e 2024.
+- **Ligação:** o candidato é ligado ao vereador pelo nome civil e, se não houver correspondência, pelo nome de urna. A campanha aparece na legislatura que começou depois da eleição, só para quem exerceu mandato nela.
+- **O que é publicado:** receita total e por origem (Fundo Especial de Financiamento de Campanha, Fundo Partidário, recursos próprios, pessoas físicas, incluindo financiamento coletivo, e outros, como doações de outros candidatos e partidos com recursos não públicos) e despesa contratada. Nomes e CPF de doadores não são gravados.
 
 ## Decisões
 
@@ -131,6 +157,10 @@ A faixa e a zona de fronteira (4.3 e 4.3.1) continuam valendo, com o mesmo boots
 | M-D5 | Governismo pelas matérias do Executivo (M5) | m0.1 |
 | M-D6 | Validação própria, sem a ordem dos partidos (M7) | m0.1 |
 | M-D7 | Câmara que migrou para o Siscam: cada período vem do sistema em que foi registrado (SAPL até a sua última votação, Siscam depois) (M1) | m0.2 |
+| M-D8 | Atividade legislativa: projetos como primeiro autor, aprovados pelas votações, denominações à parte (M9) | m0.3 |
+| M-D9 | Viagens: custo pelos empenhos do processo de viagem, dividido entre os vereadores que viajaram (M10) | m0.3 |
+| M-D10 | Gabinetes não são publicados por vereador; só a estrutura agregada da câmara (M11) | m0.3 |
+| M-D11 | Campanha pela prestação de contas do TSE (M12) | m0.3 |
 
 ## Histórico
 
@@ -138,3 +168,4 @@ A faixa e a zona de fronteira (4.3 e 4.3.1) continuam valendo, com o mesmo boots
 |---|---|---|
 | m0.1 | 13/11/2026 | Primeira versão, com Franca-SP. |
 | m0.2 | 13/11/2026 | Siscam como fonte depois da última votação do SAPL (M-D7). Nenhum critério mudou. Com os dados de maio a novembro de 2026, a 12ª legislatura de Franca passou de 62 para 74 votações informativas e passou a atender ao critério de estabilidade nas duas variantes (100% com todas as votações e 93,3% só com mérito; com o SAPL até maio, eram 80% e 80%). |
+| m0.3 | 14/11/2026 | Atividade legislativa (M9), viagens oficiais (M10), estrutura da câmara (M11) e campanha (M12). Nenhum critério da posição mudou. |

@@ -76,6 +76,7 @@ create table votacao (
     tipo            varchar not null,              -- merito | procedimento
     eh_mocao        boolean not null,
     url             varchar,                       -- página oficial da votação ou da matéria
+    aprovada        boolean,                       -- resultado de aprovação (null = sem dado)
     primary key (municipio, id_votacao)
 );
 
@@ -100,6 +101,82 @@ create table presenca (
     municipio     varchar not null,
     id_sessao     varchar not null,
     id_vereador   varchar not null
+);
+
+-- Projetos (PLO, PLC, PELOM, PDL, PR) apresentados, do Siscam (metodologia municipal, M9).
+create table projeto (
+    municipio       varchar not null,
+    id_projeto      varchar not null,
+    titulo          varchar not null,
+    sigla_tipo      varchar,
+    numero          integer,
+    ano             integer,
+    data            date,
+    ementa          varchar,
+    id_vereador     varchar,                       -- primeiro autor, se for vereador
+    do_executivo    boolean not null,
+    denominacao     boolean not null,              -- dá nome a rua ou próprio público
+    aprovado        boolean not null,              -- alguma votação em plenário o aprovou
+    url             varchar,
+    primary key (municipio, id_projeto)
+);
+
+-- Viagens oficiais (M10): o processo de viagem (PIV) do Siscam diz quem viajou; os empenhos
+-- de diárias e locomoção do EddyData dizem quanto custou.
+create table viagem (
+    municipio       varchar not null,
+    numero          integer not null,              -- PIV nº/ano
+    ano             integer not null,
+    data            date,
+    ementa          varchar,
+    url             varchar,
+    primary key (municipio, numero, ano)
+);
+
+create table viagem_vereador (
+    municipio       varchar not null,
+    numero          integer not null,
+    ano             integer not null,
+    id_vereador     varchar not null
+);
+
+create table despesa_viagem (
+    municipio       varchar not null,
+    id_empenho      varchar not null,
+    numero_empenho  integer,
+    data            date not null,
+    especie         varchar not null,              -- EMO empenho | EOA anulação
+    valor           double not null,
+    despesa         varchar,
+    piv_numero      integer,                       -- do histórico do empenho (EOA herda do EMO)
+    piv_ano         integer
+);
+
+-- Folha da Câmara, só subsídio de vereadores e salário de assessores parlamentares.
+create table folha (
+    municipio       varchar not null,
+    ano             integer not null,
+    mes             integer not null,
+    nome            varchar,
+    cargo           varchar,
+    calculo         varchar,                       -- FOLHA, FERIAS 1, 13º…
+    valor_bruto     double not null
+);
+
+-- Campanha (M12): prestação de contas ao TSE de quem foi vereador na legislatura seguinte.
+create table campanha (
+    municipio       varchar not null,
+    id_vereador     varchar not null,
+    ano_eleicao     integer not null,
+    partido         varchar,
+    situacao        varchar,                       -- ELEITO POR QP | ELEITO POR MÉDIA | SUPLENTE…
+    receita         double not null,
+    fundo_especial  double not null,               -- FEFC (fundo eleitoral)
+    fundo_partidario double not null,
+    proprios        double not null,
+    pessoas_fisicas double not null,               -- inclui financiamento coletivo
+    outros          double not null,               -- partidos e candidatos com outros recursos
+    despesa         double not null
 );
 
 create table nota_especialistas (

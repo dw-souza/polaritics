@@ -82,7 +82,13 @@ jobs:
             data/raw/municipal/*/registrovotacao.json
             data/raw/municipal/*/votoparlamentar.json
           key: sapl-congelado-v1
-      - name: Coletar SAPL e Siscam das câmaras
+      # Prestação de contas de eleições já fechadas (TSE): não muda.
+      - name: Restaurar os dados do TSE
+        uses: actions/cache@v4
+        with:
+          path: data/raw/municipal/*/tse_*.json
+          key: tse-v1
+      - name: Coletar SAPL, Siscam, EddyData e TSE das câmaras
         run: uv run polaritics municipal coletar
       - name: Calcular e validar
         run: uv run polaritics municipal calcular

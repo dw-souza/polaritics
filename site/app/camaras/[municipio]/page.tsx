@@ -4,12 +4,23 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { ReguaCamara } from "@/components/ReguaCamara";
-import { VOTACOES, formatarData, formatarNota, formatarPct, lerVisao, type Votacoes } from "@/lib/escala";
+import {
+  VOTACOES,
+  formatarData,
+  formatarNota,
+  formatarPct,
+  formatarReais,
+  formatarReaisCurto,
+  lerVisao,
+  type Votacoes,
+} from "@/lib/escala";
 import {
   URL_METODOLOGIA_MUNICIPAL,
   hrefCamara,
+  estrutura,
   hrefVereador,
   legislaturas,
+  type Estrutura,
   municipio,
   vereadoresDaLegislatura,
   type LegislaturaMunicipal,
@@ -47,7 +58,10 @@ async function Camara({ params, searchParams }: PageProps<"/camaras/[municipio]"
   const pedida = Number(busca.legislatura);
   const leg = legs.find((l) => l.numero === pedida) ?? legs[0];
   const publicada = leg.variantes.includes(votacoes);
-  const linhas = await vereadoresDaLegislatura(slug, leg.numero, votacoes);
+  const [linhas, estr] = await Promise.all([
+    vereadoresDaLegislatura(slug, leg.numero, votacoes),
+    estrutura(slug),
+  ]);
   const comPosicao = linhas.flatMap((l) => (l.posicao ? [l.posicao] : []));
   // o link leva a legislatura em vista, para a ficha abrir nela
   const hrefDoVereador = (id: string) =>
@@ -132,6 +146,8 @@ async function Camara({ params, searchParams }: PageProps<"/camaras/[municipio]"
         )}
       </section>
 
+      {estr && <QuantoCusta e={estr} />}
+
       <section className="secao">
         <div className="secao-cab">
           <h2>Todos os vereadores</h2>
@@ -215,6 +231,9 @@ function Tabela({
             <th className="n">Na câmara</th>
             <th className="n">Com o prefeito</th>
             <th className="n">Presença</th>
+            <th className="n">Projetos aprovados</th>
+            <th className="n">Viagens</th>
+            <th className="n">Custo das viagens</th>
           </tr>
         </thead>
         <tbody>
@@ -247,6 +266,11 @@ function Tabela({
                     : "—"}
               </td>
               <td className="n">{l.presenca !== null ? formatarPct(l.presenca) : "—"}</td>
+              <td className="n">{l.aprovados ?? 0}</td>
+              <td className="n">{l.viagens ?? 0}</td>
+              <td className="n" style={{ whiteSpace: "nowrap" }}>
+                {l.viagens ? formatarReaisCurto(l.custo_atribuido ?? 0) : "—"}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -255,8 +279,90 @@ function Tabela({
         <strong>Na câmara:</strong> ordem da esquerda para a direita (1º = mais à esquerda).{" "}
         <strong>Com o prefeito:</strong> votos a favor dos projetos do prefeito nas votações em que
         alguém votou contra; com menos de 5 dessas votações, mostramos a contagem.{" "}
-        <strong>Presença:</strong> sessões ordinárias e extraordinárias com lista registrada.
+        <strong>Presença:</strong> sessões ordinárias e extraordinárias com lista registrada.{" "}
+        <strong>Projetos aprovados:</strong> como primeiro autor, inclusive os que só dão nome a
+        ruas. <strong>Viagens:</strong> número de viagens oficiais; o custo é a parte de cada viagem
+        que cabe ao vereador.
       </p>
     </div>
+  );
+}
+
+function QuantoCusta({ e }: { e: Estrutura }) {
+  const mes = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(e.ano, e.mes - 1, 1)));
+  const porGabinete = e.vereadores > 0 ? e.assessores / e.vereadores : null;
+  return (
+    <section className="secao">
+      <div className="secao-cab">
+        <h2>Quanto custa a câmara</h2>
+        <span className="rotulo">Folha de {mes}</span>
+      </div>
+      <div className={estilos.fatos}>
+        <div>
+          <span className="rotulo">Subsídio de vereador</span>
+          <span className={`${estilos.grande} num`}>
+            {e.subsidio !== null ? formatarReaisCurto(e.subsidio) : "—"}
+          </span>
+          <span className="pequeno discreto">bruto, por mês; igual para todos</span>
+        </div>
+        <div>
+          <span className="rotulo">Assessores parlamentares</span>
+          <span className={`${estilos.grande} num`}>{e.assessores}</span>
+          <span className="pequeno discreto">
+            {porGabinete !== null && `cerca de ${Math.round(porGabinete)} por gabinete`}
+          </span>
+        </div>
+        <div>
+          <span className="rotulo">Salários dos assessores</span>
+          <span className={`${estilos.grande} num`}>
+            {e.custo_assessores !== null ? formatarReaisCurto(e.custo_assessores) : "—"}
+          </span>
+          <span className="pequeno discreto">brutos, no mês</span>
+        </div>
+        <div>
+          <span className="rotulo">Viagens oficiais</span>
+          <span className={`${estilos.grande} num`}>
+            {e.viagens_por_ano.length > 0
+              ? formatarReaisCurto(e.viagens_por_ano[e.viagens_por_ano.length - 1].total)
+              : "—"}
+          </span>
+          <span className="pequeno discreto">
+            {e.viagens_por_ano.length > 0 &&
+              `em ${e.viagens_por_ano[e.viagens_por_ano.length - 1].ano}, até agora`}
+          </span>
+        </div>
+      </div>
+      {e.viagens_por_ano.length > 1 && (
+        <div className="tabela-rolagem" style={{ marginTop: 18 }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Ano</th>
+                <th className="n">Gasto com viagens</th>
+                <th className="n">Com vereador identificado</th>
+                <th className="n">Sem processo de viagem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {e.viagens_por_ano.map((a) => (
+                <tr key={a.ano}>
+                  <td className="num">{a.ano}</td>
+                  <td className="n">{formatarReais(a.total)}</td>
+                  <td className="n">{formatarReais(a.com_vereador)}</td>
+                  <td className="n">{formatarReais(a.sem_piv)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="pequeno discreto leitura" style={{ marginTop: 12 }}>
+        A folha não informa em qual gabinete cada assessor trabalha, por isso não mostramos a
+        equipe de cada vereador. O gasto com viagens inclui diárias e locomoção de servidores; o
+        que não tem processo de viagem é, na maior parte, o pedágio da frota.{" "}
+        <a href={URL_METODOLOGIA_MUNICIPAL}>Como é calculado</a>
+      </p>
+    </section>
   );
 }

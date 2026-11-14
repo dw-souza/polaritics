@@ -12,12 +12,21 @@ import {
   formatarDataCurta,
   formatarNota,
   formatarPct,
+  formatarReais,
+  formatarReaisCurto,
   fraseFaixa,
   lerVisao,
   type Votacoes,
 } from "@/lib/escala";
 import {
   URL_METODOLOGIA_MUNICIPAL,
+  atividade,
+  campanha,
+  situacaoEleitoral,
+  viagens,
+  type Atividade,
+  type Campanha,
+  type Viagens,
   cargoVereador,
   hrefCamara,
   hrefVereador,
@@ -178,11 +187,14 @@ async function Legislatura({
   notas: Record<string, number>;
 }) {
   const publicada = mandato.variantes.includes(votacoes);
-  const [linhas, explicativas] = await Promise.all([
+  const [linhas, explicativas, atv, vgs, camp] = await Promise.all([
     vereadoresDaLegislatura(m.municipio, mandato.legislatura, votacoes),
     publicada
       ? votacoesQueMaisPesaram(m.municipio, v.id_vereador, mandato.legislatura, votacoes)
       : [],
+    atividade(m.municipio, v.id_vereador, mandato.legislatura),
+    viagens(m.municipio, v.id_vereador, mandato.legislatura),
+    campanha(m.municipio, v.id_vereador, mandato.legislatura),
   ]);
   const camara = linhas.flatMap((l) => (l.posicao ? [l.posicao] : []));
   const p = camara.find((x) => x.id_vereador === v.id_vereador);
@@ -349,6 +361,8 @@ async function Legislatura({
         </p>
       )}
 
+      <Mandato atividade={atv} viagens={vgs} campanha={camp} sexo={v.sexo} />
+
       {explicativas.length > 0 && (
         <div style={{ marginTop: 28 }}>
           <div className="secao-cab">
@@ -483,5 +497,169 @@ function Comparacao({
       Especialistas classificam o {partido} como <strong>{faixa(esp).toLowerCase()}</strong> (
       {formatarNota(esp)}). Pelos votos, {nome} fica {lado} essa classificação.
     </p>
+  );
+}
+
+function Mandato({
+  atividade: a,
+  viagens: vg,
+  campanha: c,
+  sexo,
+}: {
+  atividade: Atividade | null;
+  viagens: Viagens | null;
+  campanha: Campanha | null;
+  sexo: string | null;
+}) {
+  const autor = sexo === "F" ? "autora" : "autor";
+  const fontes = c
+    ? [
+        { nome: "Fundo eleitoral (FEFC)", valor: c.fundo_especial },
+        { nome: "Fundo partidário", valor: c.fundo_partidario },
+        { nome: "Recursos próprios", valor: c.proprios },
+        { nome: "Pessoas físicas", valor: c.pessoas_fisicas },
+        { nome: "Outros (partidos, candidatos)", valor: c.outros },
+      ].filter((f) => f.valor > 0)
+    : [];
+  const maiorFonte = Math.max(1, ...fontes.map((f) => f.valor));
+  return (
+    <div style={{ marginTop: 32 }}>
+      <div className="secao-cab">
+        <h3>O mandato em números</h3>
+      </div>
+      <div className={estilos.blocos}>
+        <div className={estilos.bloco}>
+          <span className="rotulo">Projetos aprovados</span>
+          <span className={`${estilos.valor} num`}>
+            {a?.aprovados ?? 0} <small>de {a?.apresentados ?? 0}</small>
+          </span>
+          <span className={estilos.pos}>
+            <span>
+              {a && a.aprovados_denominacao > 0
+                ? `${a.aprovados_denominacao} só dão nome a ruas ou prédios`
+                : "como primeiro autor"}
+            </span>
+          </span>
+          <details>
+            <summary>O que é</summary>
+            Projetos de lei, de decreto legislativo e de resolução apresentados nesta legislatura
+            como {autor} principal, e quantos foram aprovados em plenário. Quantidade não é
+            qualidade.
+          </details>
+        </div>
+        <div className={estilos.bloco}>
+          <span className="rotulo">Viagens oficiais</span>
+          <span className={`${estilos.valor} num`}>{vg?.viagens ?? 0}</span>
+          <span className={estilos.pos}>
+            <span>com processo de viagem identificado</span>
+          </span>
+        </div>
+        <div className={estilos.bloco}>
+          <span className="rotulo">Custo das viagens</span>
+          {vg ? (
+            <>
+              <span className={`${estilos.valor} num`}>
+                {formatarReaisCurto(vg.custo_atribuido)}
+              </span>
+              <span className={estilos.pos}>
+                <span>parte dele, de {formatarReaisCurto(vg.custo_das_viagens)} no total</span>
+              </span>
+            </>
+          ) : (
+            <span className={estilos.semDado}>Nenhuma viagem</span>
+          )}
+          <details>
+            <summary>O que é</summary>
+            Diárias, passagens e locomoção das viagens, inclusive de assessores e motoristas,
+            menos o que foi devolvido. Quando vereadores viajam juntos, o custo é dividido
+            igualmente entre eles.
+          </details>
+        </div>
+        <div className={estilos.bloco}>
+          <span className="rotulo">Campanha{c ? ` de ${c.ano_eleicao}` : ""}</span>
+          {c ? (
+            <>
+              <span className={`${estilos.valor} num`}>{formatarReaisCurto(c.receita)}</span>
+              <span className={estilos.pos}>
+                <span>
+                  arrecadados · {c.partido} ·{" "}
+                  {situacaoEleitoral(c.situacao)}
+                </span>
+              </span>
+            </>
+          ) : (
+            <span className={estilos.semDado}>Sem prestação de contas</span>
+          )}
+          <details>
+            <summary>O que é</summary>
+            Receitas da campanha declaradas ao TSE na eleição que levou a este mandato.
+          </details>
+        </div>
+      </div>
+
+      <div className={estilos.duas} style={{ marginTop: 24 }}>
+        <div>
+          <h4 className="rotulo">Projetos aprovados (sem as denominações)</h4>
+          {a && a.projetos.length > 0 ? (
+            <ul className={estilos.aprovadas}>
+              {a.projetos.slice(0, 6).map((x) => (
+                <li key={x.titulo}>
+                  {x.url ? <a href={x.url}>{x.titulo}</a> : x.titulo}
+                  {x.ementa && <span className={estilos.ementaCurta}>{x.ementa}</span>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="pequeno discreto">Nenhum.</p>
+          )}
+          {a && a.projetos.length > 6 && (
+            <p className="pequeno discreto">e mais {a.projetos.length - 6}.</p>
+          )}
+        </div>
+        <div>
+          <h4 className="rotulo">Viagens mais caras</h4>
+          {vg && vg.lista.length > 0 ? (
+            <ul className={estilos.aprovadas}>
+              {vg.lista.slice(0, 5).map((x) => (
+                <li key={`${x.numero}-${x.ano}`}>
+                  {x.url ? (
+                    <a href={x.url}>
+                      PIV {x.numero}/{x.ano}
+                    </a>
+                  ) : (
+                    `PIV ${x.numero}/${x.ano}`
+                  )}{" "}
+                  <span className="discreto num">
+                    · {formatarReais(x.custo)}
+                    {x.n_vereadores > 1 ? ` · ${x.n_vereadores} vereadores` : ""}
+                  </span>
+                  {x.ementa && <span className={estilos.ementaCurta}>{x.ementa}</span>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="pequeno discreto">Nenhuma viagem oficial identificada.</p>
+          )}
+          {fontes.length > 0 && (
+            <>
+              <h4 className="rotulo" style={{ marginTop: 20 }}>
+                De onde veio o dinheiro da campanha
+              </h4>
+              <ul className={estilos.barras}>
+                {fontes.map((f) => (
+                  <li key={f.nome}>
+                    <span>{f.nome}</span>
+                    <span className={estilos.trilhoBarra} aria-hidden="true">
+                      <i style={{ width: `${(f.valor / maiorFonte) * 100}%` }} />
+                    </span>
+                    <span className="num">{formatarReais(f.valor)}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import unicodedata
+from datetime import date
 from pathlib import Path
 
 import duckdb
@@ -14,6 +15,7 @@ from polaritics.base.partidos import harmonizar
 from polaritics.coleta import especialistas
 from polaritics.config import DIR_BRUTOS
 from polaritics.municipal.config import CAMINHO_BASE_MUNICIPAL, Municipio
+from polaritics.municipal.siscam import VOTANTE
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +69,8 @@ def _json(brutos: Path, nome: str) -> str:
 
 def _carregar_municipio(con, m: Municipio, brutos: Path) -> None:
     con.execute("insert into municipio values (?, ?, ?, ?)", [m.slug, m.nome, m.uf, m.sapl])
-    con.executemany(
+    _executemany(
+        con,
         "insert into prefeito values (?, ?, ?, ?, ?)",
         [
             (m.slug, p.nome, p.partido_na_posse, p.periodo.inicio, p.periodo.fim)
@@ -75,11 +78,13 @@ def _carregar_municipio(con, m: Municipio, brutos: Path) -> None:
         ],
     )
     legislaturas = {r["id"]: r for r in _ler(brutos, "legislatura")}
-    con.executemany(
+    _executemany(
+        con,
         "insert into legislatura values (?, ?, ?, ?)",
         [(m.slug, r["numero"], r["data_inicio"], r["data_fim"]) for r in legislaturas.values()],
     )
-    con.executemany(
+    _executemany(
+        con,
         "insert into vereador values (?, ?, ?, ?, ?, ?)",
         [
             (
@@ -93,7 +98,8 @@ def _carregar_municipio(con, m: Municipio, brutos: Path) -> None:
             for r in _ler(brutos, "parlamentar")
         ],
     )
-    con.executemany(
+    _executemany(
+        con,
         "insert into mandato values (?, ?, ?, ?, ?, ?)",
         [
             (
@@ -108,7 +114,8 @@ def _carregar_municipio(con, m: Municipio, brutos: Path) -> None:
         ],
     )
     partidos = {r["id"]: r["sigla"] for r in _ler(brutos, "partido")}
-    con.executemany(
+    _executemany(
+        con,
         "insert into filiacao values (?, ?, ?, ?, ?, ?)",
         [
             (
@@ -151,10 +158,12 @@ def _carregar_votacoes(con, m: Municipio, brutos: Path) -> None:
     con.execute(
         f"""
         create temp table registro as
-        select ?::varchar as municipio, id::varchar as id_votacao,
-               left(data_hora::varchar, 10)::date as data, materia::varchar as id_materia,
-               numero_votos_sim as placar_sim, numero_votos_nao as placar_nao
-        from {_json(brutos, "registrovotacao")}
+        select ?::varchar as municipio, r.id::varchar as id_votacao,
+               left(r.data_hora::varchar, 10)::date as data, r.materia::varchar as id_materia,
+               r.numero_votos_sim as placar_sim, r.numero_votos_nao as placar_nao,
+               t.natureza = 'A' as aprovada
+        from {_json(brutos, "registrovotacao")} r
+        left join {_json(brutos, "tiporesultado")} t on t.id = r.tipo_resultado_votacao
         """,
         [m.slug],
     )
@@ -165,7 +174,7 @@ def _carregar_votacoes(con, m: Municipio, brutos: Path) -> None:
                r.placar_nao,
                case when mt.sigla_tipo in ({procedimento}) then 'procedimento' else 'merito' end,
                coalesce(lower(mt.tipo) like 'moção%', false),
-               '{m.sapl}/materia/' || r.id_materia
+               '{m.sapl}/materia/' || r.id_materia, r.aprovada
         from registro r
         left join materia mt on mt.municipio = r.municipio and mt.id_materia = r.id_materia
         left join legislatura l on l.municipio = r.municipio and r.data between l.inicio and l.fim
@@ -185,7 +194,8 @@ def _carregar_votacoes(con, m: Municipio, brutos: Path) -> None:
 
 def _carregar_presenca(con, m: Municipio, brutos: Path) -> None:
     tipos = {r["id"]: r["nome"] for r in _ler(brutos, "tiposessao")}
-    con.executemany(
+    _executemany(
+        con,
         "insert into sessao values (?, ?, ?, ?)",
         [
             (m.slug, str(r["id"]), r["data_inicio"], tipos.get(r["tipo"]))
@@ -193,7 +203,8 @@ def _carregar_presenca(con, m: Municipio, brutos: Path) -> None:
             if r.get("finalizada")
         ],
     )
-    con.executemany(
+    _executemany(
+        con,
         "insert into presenca values (?, ?, ?)",
         [
             (m.slug, str(r["sessao_plenaria"]), str(r["parlamentar"]))
@@ -232,6 +243,20 @@ VOTOS_SISCAM = {
     "Não votaram": ("Não Votou", None),
     "Ausentes": ("Ausente", None),
 }
+
+
+def _executemany(con, sql: str, linhas) -> None:
+    """`executemany` que aceita lista vazia (o DuckDB recusa)."""
+    if linhas := list(linhas):
+        con.executemany(sql, linhas)
+
+
+def _inserir(con, tabela: str, linhas: list[dict], consulta: str = "select * from linhas") -> None:
+    """Insere linhas (dicts) pela tabela Arrow; lista vazia não insere nada."""
+    if linhas:
+        con.register("linhas", pa.Table.from_pylist(linhas))
+        con.execute(f"insert into {tabela} {consulta}")
+        con.unregister("linhas")
 
 
 def classificar_titulo(titulo: str) -> tuple[str | None, str | None]:
@@ -274,7 +299,11 @@ def _carregar_siscam(con, m: Municipio, brutos: Path) -> None:
     corte = con.execute(
         "select max(data)::varchar from votacao where municipio = ?", [m.slug]
     ).fetchone()[0]
-    votacoes = [r for r in _ler(brutos, "siscam_votacoes") if corte is None or r["data"] > corte]
+    votacoes = [
+        r
+        for r in _ler(brutos, "siscam_votacoes")
+        if r["tipo"] == "Nominal" and (corte is None or r["data"] > corte)
+    ]
     frequencias = [
         r for r in _ler(brutos, "siscam_frequencias") if corte is None or r["data"] > corte
     ]
@@ -337,21 +366,21 @@ def _carregar_siscam(con, m: Municipio, brutos: Path) -> None:
                 "tipo": "procedimento" if sigla in TIPOS_PROCEDIMENTO else "merito",
                 "eh_mocao": sigla == "MO",
                 "url": f"{m.siscam}/Siscam/Votacoes/Details?id={r['id']}",
+                "aprovada": (r.get("resultado") or "").lower().startswith("aprovad"),
             }
         )
-    con.register("materias_siscam", pa.Table.from_pylist(list(materias.values())))
-    con.execute("insert into materia select * from materias_siscam")
-    con.register("votacoes_siscam", pa.Table.from_pylist(linhas_votacao))
-    con.execute("""
-        insert into votacao
-        select v.municipio, v.id_votacao, v.data::date, l.numero, v.id_materia, v.placar_sim,
-               v.placar_nao, v.tipo, v.eh_mocao, v.url
-        from votacoes_siscam v
-        left join legislatura l on l.municipio = v.municipio
-             and v.data::date between l.inicio and l.fim
-    """)
-    con.register("votos_siscam", pa.Table.from_pylist(linhas_voto))
-    con.execute("insert into voto select * from votos_siscam")
+    _inserir(con, "materia", list(materias.values()))
+    _inserir(
+        con,
+        "votacao",
+        linhas_votacao,
+        """select v.municipio, v.id_votacao, v.data::date, l.numero, v.id_materia, v.placar_sim,
+                  v.placar_nao, v.tipo, v.eh_mocao, v.url, v.aprovada
+           from linhas v
+           left join legislatura l on l.municipio = v.municipio
+                and v.data::date between l.inicio and l.fim""",
+    )
+    _inserir(con, "voto", linhas_voto)
 
     # Presença: presente na sessão quem aparece em "Presentes" em alguma chamada dela
     sessoes = {}
@@ -361,11 +390,13 @@ def _carregar_siscam(con, m: Municipio, brutos: Path) -> None:
         tipo = re.search(r"Sessão (Ordinária|Extraordinária|Solene)", r["sessao"] or "")
         dia = min(r["data"], sessoes.get(r["id_sessao"], (r["data"],))[0])
         sessoes[r["id_sessao"]] = (dia, f"Sessão {tipo[1]}" if tipo else None)
-    con.executemany(
+    _executemany(
+        con,
         "insert into sessao values (?, ?, ?, ?)",
         [(m.slug, PREFIXO_SISCAM + str(i), dia, tipo) for i, (dia, tipo) in sessoes.items()],
     )
-    con.executemany(
+    _executemany(
+        con,
         "insert into presenca values (?, ?, ?)",
         sorted(
             {
@@ -378,11 +409,259 @@ def _carregar_siscam(con, m: Municipio, brutos: Path) -> None:
     )
 
 
+# Ementas de projetos que só dão nome a vias e próprios públicos (homenagens).
+DENOMINACAO = re.compile(
+    r"^\W*(denomina|d[aá] denomina[cç][aã]o|d[aá] nome|altera a denomina[cç][aã]o)", re.I
+)
+NUMERO_ANO = re.compile(r"N[ºo°]\s*(\d+)/(\d{4})")
+
+
+def chave_materia(titulo: str) -> tuple[str | None, int | None, int | None]:
+    """(tipo, número, ano) da matéria pelo título, para ligar documentos e votações."""
+    sigla, _ = classificar_titulo(titulo)
+    numero = NUMERO_ANO.search(titulo)
+    return (sigla, int(numero[1]), int(numero[2])) if numero else (sigla, None, None)
+
+
+def _carregar_projetos(con, m: Municipio, brutos: Path) -> None:
+    """Projetos de 2021 em diante, do Siscam, inclusive o período do SAPL: a lista de projetos
+    por ano bate com a do SAPL e só o Siscam continua atualizada (M9). Aprovado = alguma
+    votação da própria matéria (nominal ou simbólica) com resultado de aprovação."""
+    if not (brutos / "siscam_projetos.json").exists():
+        return
+    cadastro = {
+        normalizar_nome(nome): id_
+        for id_, nome in con.execute(
+            "select id_vereador, nome from vereador where municipio = ?", [m.slug]
+        ).fetchall()
+    }
+    executivo = {normalizar_nome(p.nome) for p in m.prefeitos} | {"poder executivo"}
+    aprovados = {
+        chave_materia(r["titulo"])
+        for r in _ler(brutos, "siscam_votacoes")
+        if (r.get("resultado") or "").lower().startswith("aprovad")
+    }
+    linhas = []
+    for r in _ler(brutos, "siscam_projetos"):
+        chave = chave_materia(r["titulo"])
+        if chave[0] not in TIPOS_PROJETO | {"PR"}:
+            continue
+        autoria = r["autoria"] or ""
+        autores = [cadastro.get(normalizar_nome(nome)) for _, nome in VOTANTE.findall(autoria)]
+        linhas.append(
+            {
+                "municipio": m.slug,
+                "id_projeto": str(r["id"]),
+                "titulo": r["titulo"],
+                "sigla_tipo": chave[0],
+                "numero": chave[1],
+                "ano": chave[2],
+                "data": r["data"],
+                "ementa": r["ementa"],
+                "id_vereador": next((a for a in autores if a), None),
+                "do_executivo": any(
+                    normalizar_nome(a.strip()) in executivo for a in autoria.split(",")
+                ),
+                "denominacao": bool(DENOMINACAO.match(r["ementa"] or "")),
+                "aprovado": chave in aprovados,
+                "url": f"{m.siscam}/Siscam/Documentos/Details?id={r['id']}",
+            }
+        )
+    _inserir(con, "projeto", linhas, "select * replace (data::date as data) from linhas")
+
+
+CATEGORIAS_RECEITA = ("fundo_especial", "fundo_partidario", "proprios", "pessoas_fisicas", "outros")
+PIV = re.compile(r"PIV\s*(?:N[ºo°.]*\s*)?(\d+)\s*/\s*(\d{4})", re.I)
+
+
+# Na ementa do PIV, a lista de vereadores vem antes da dos acompanhantes; corta-se a partir da
+# primeira menção a servidor para que o nome de um assessor não seja lido como de vereador.
+ACOMPANHANTES = re.compile(
+    r"\b(assessor|assessora|assessores|servidor|servidora|servidores|serv\.|motorista|"
+    r"advogad|analista|oficial legislativo|diretor|diretora|chefe de|contador|procurador)",
+    re.I,
+)
+VEREADOR_NO_EMPENHO = re.compile(r"\bVER(?:EADOR|EADORA)?\.?\s+([A-ZÀ-Ü][A-ZÀ-Ü ]+)")
+
+
+def apelidos(vereadores: dict[str, tuple[str, str | None]]) -> dict[str, str]:
+    """Apelido → vereador, com o nome parlamentar inteiro e cada palavra dele (4+ letras) que
+    aponte para um único vereador da legislatura. Palavras compartilhadas ("Garcia", "Farmácia")
+    ficam de fora."""
+    candidatos: dict[str, set[str]] = {}
+    for id_, (nome, _) in vereadores.items():
+        normal = normalizar_nome(nome)
+        candidatos.setdefault(normal, set()).add(id_)
+        for palavra in re.findall(r"[a-z]{4,}", normal):
+            candidatos.setdefault(palavra, set()).add(id_)
+    return {apelido: next(iter(ids)) for apelido, ids in candidatos.items() if len(ids) == 1}
+
+
+def participantes(
+    autoria: str, ementa: str, historicos: list[str], vereadores: dict[str, tuple[str, str | None]]
+) -> set[str]:
+    """Vereadores de uma viagem, por três sinais: a autoria completa do PIV ("Nome civil (Nome
+    parlamentar)"), os apelidos na ementa antes da lista de acompanhantes e o nome civil depois
+    de "VER." no histórico dos empenhos (metodologia municipal, M10)."""
+    por_parlamentar = {normalizar_nome(n): id_ for id_, (n, _) in vereadores.items()}
+    por_civil = {normalizar_nome(c): id_ for id_, (_, c) in vereadores.items() if c}
+    achados = {
+        por_parlamentar[normalizar_nome(nome)]
+        for _, nome in VOTANTE.findall(autoria or "")
+        if normalizar_nome(nome) in por_parlamentar
+    }
+    trecho = ACOMPANHANTES.split(ementa or "", maxsplit=1)[0]
+    palavras = normalizar_nome(trecho)
+    for apelido, id_ in apelidos(vereadores).items():
+        if re.search(rf"\b{re.escape(apelido)}\b", palavras):
+            achados.add(id_)
+    for historico in historicos:
+        for nome in VEREADOR_NO_EMPENHO.findall(historico or ""):
+            nome = normalizar_nome(nome)
+            achados |= {id_ for civil, id_ in por_civil.items() if nome.startswith(civil)}
+    return achados
+
+
+def _carregar_viagens(con, m: Municipio, brutos: Path) -> None:
+    if not (brutos / "siscam_piv.json").exists():
+        return
+    empenhos = (
+        _ler(brutos, "eddydata_viagens") if (brutos / "eddydata_viagens.json").exists() else []
+    )
+    # a anulação (EOA) tem o mesmo número do empenho (EMO) que anula, no mesmo exercício
+    piv_do_empenho, historicos = {}, {}
+    for r in empenhos:
+        if r["especie"] == "EMO" and (achado := PIV.search(r["historico"] or "")):
+            piv = (int(achado[1]), int(achado[2]))
+            piv_do_empenho[(r["data"][:4], r["numero"])] = piv
+            historicos.setdefault(piv, []).append(r["historico"])
+    mandatos = con.execute(
+        """select m.id_vereador, v.nome, v.nome_completo, m.inicio, m.fim
+           from mandato m join vereador v using (municipio, id_vereador)
+           where m.municipio = ?""",
+        [m.slug],
+    ).fetchall()
+    viagens, presentes = {}, set()
+    for r in _ler(brutos, "siscam_piv"):
+        numero = NUMERO_ANO.search(r["titulo"])
+        if not numero or not r["data"]:
+            continue
+        chave = (int(numero[1]), int(numero[2]))
+        viagens[chave] = (
+            m.slug,
+            *chave,
+            r["data"],
+            r["ementa"],
+            f"{m.siscam}/Siscam/Documentos/Details?id={r['id']}",
+        )
+        dia = date.fromisoformat(r["data"])
+        em_exercicio = {
+            id_: (nome, civil) for id_, nome, civil, ini, fim in mandatos if ini <= dia <= fim
+        }
+        for id_ in participantes(
+            r["autoria"], r["ementa"], historicos.get(chave, []), em_exercicio
+        ):
+            presentes.add((m.slug, *chave, id_))
+    _executemany(con, "insert into viagem values (?, ?, ?, ?, ?, ?)", list(viagens.values()))
+    _executemany(con, "insert into viagem_vereador values (?, ?, ?, ?)", sorted(presentes))
+    _executemany(
+        con,
+        "insert into despesa_viagem values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            (
+                m.slug,
+                str(r["id"]),
+                r["numero"],
+                r["data"],
+                r["especie"],
+                r["valor"],
+                r["despesa"],
+                *piv_do_empenho.get((r["data"][:4], r["numero"]), (None, None)),
+            )
+            for r in empenhos
+        ],
+    )
+
+
+def _carregar_folha(con, m: Municipio, brutos: Path) -> None:
+    if not (brutos / "eddydata_folha.json").exists():
+        return
+    _executemany(
+        con,
+        "insert into folha values (?, ?, ?, ?, ?, ?, ?)",
+        [
+            (m.slug, r["ano"], r["mes"], r["nome"], r["cargo"], r["calculo"], r["valor_bruto"])
+            for r in _ler(brutos, "eddydata_folha")
+        ],
+    )
+
+
+def _valor_tse(texto: str) -> float:
+    return float((texto or "0").replace(".", "").replace(",", ".")) if texto != "#NULO" else 0.0
+
+
+def categoria_receita(origem: str, fonte: str) -> str:
+    """Origem do dinheiro de campanha: fundos públicos pela fonte; o resto pela origem."""
+    if fonte == "FUNDO ESPECIAL":
+        return "fundo_especial"
+    if fonte == "FUNDO PARTIDARIO":
+        return "fundo_partidario"
+    if origem == "Recursos próprios":
+        return "proprios"
+    if origem in ("Recursos de pessoas físicas", "Recursos de Financiamento Coletivo"):
+        return "pessoas_fisicas"
+    return "outros"
+
+
+def _carregar_campanha(con, m: Municipio, brutos: Path) -> None:
+    """Liga o candidato ao vereador pelo nome civil e, se não achar, pelo nome de urna."""
+    cadastro = con.execute(
+        "select id_vereador, nome, nome_completo from vereador where municipio = ?", [m.slug]
+    ).fetchall()
+    por_civil = {normalizar_nome(c): id_ for id_, _, c in cadastro if c}
+    por_urna = {normalizar_nome(n): id_ for id_, n, _ in cadastro}
+    for arquivo in sorted(brutos.glob("tse_candidatos_*.json")):
+        ano = int(arquivo.stem.rsplit("_", 1)[1])
+        ids = {}
+        for c in _ler(brutos, arquivo.stem):
+            id_ = por_civil.get(normalizar_nome(c["NM_CANDIDATO"])) or por_urna.get(
+                normalizar_nome(c["NM_URNA_CANDIDATO"])
+            )
+            if id_:
+                ids[c["SQ_CANDIDATO"]] = (id_, c["SG_PARTIDO"], c["DS_SIT_TOT_TURNO"])
+        totais = {sq: dict.fromkeys(CATEGORIAS_RECEITA, 0.0) | {"despesa": 0.0} for sq in ids}
+        for r in _ler(brutos, f"tse_receitas_{ano}"):
+            if r["SQ_CANDIDATO"] in totais:
+                categoria = categoria_receita(r["DS_ORIGEM_RECEITA"], r["DS_FONTE_RECEITA"])
+                totais[r["SQ_CANDIDATO"]][categoria] += _valor_tse(r["VR_RECEITA"])
+        for r in _ler(brutos, f"tse_despesas_{ano}"):
+            if r["SQ_CANDIDATO"] in totais:
+                totais[r["SQ_CANDIDATO"]]["despesa"] += _valor_tse(r["VR_DESPESA_CONTRATADA"])
+        _executemany(
+            con,
+            "insert into campanha values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    m.slug,
+                    id_,
+                    ano,
+                    partido,
+                    situacao,
+                    sum(totais[sq][c] for c in CATEGORIAS_RECEITA),
+                    *(totais[sq][c] for c in CATEGORIAS_RECEITA),
+                    totais[sq]["despesa"],
+                )
+                for sq, (id_, partido, situacao) in ids.items()
+            ],
+        )
+
+
 def _carregar_especialistas(con, arquivo: Path) -> None:
     if not arquivo.exists():
         log.warning("notas dos especialistas ausentes (%s); rode `municipal coletar`", arquivo)
         return
-    con.executemany(
+    _executemany(
+        con,
         "insert into nota_especialistas values (?, ?, ?)",
         [(n.partido, n.nota, n.origem) for n in especialistas.notas_2022(arquivo)],
     )
@@ -423,6 +702,10 @@ def construir_base(
             _carregar_presenca(con, m, brutos)
             if m.siscam:
                 _carregar_siscam(con, m, brutos)
+                _carregar_projetos(con, m, brutos)
+                _carregar_viagens(con, m, brutos)
+            _carregar_folha(con, m, brutos)
+            _carregar_campanha(con, m, brutos)
     temporario.replace(destino)
     log.info("base municipal construída em %s", destino)
     return destino
