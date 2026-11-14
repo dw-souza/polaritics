@@ -8,6 +8,7 @@ import { VOTACOES, formatarData, formatarNota, formatarPct, lerVisao, type Votac
 import {
   URL_METODOLOGIA_MUNICIPAL,
   hrefCamara,
+  hrefVereador,
   legislaturas,
   municipio,
   vereadoresDaLegislatura,
@@ -48,7 +49,9 @@ async function Camara({ params, searchParams }: PageProps<"/camaras/[municipio]"
   const publicada = leg.variantes.includes(votacoes);
   const linhas = await vereadoresDaLegislatura(slug, leg.numero, votacoes);
   const comPosicao = linhas.flatMap((l) => (l.posicao ? [l.posicao] : []));
-  const hrefVereador = (id: string) => `/camaras/${slug}/vereador/${id}`;
+  // o link leva a legislatura em vista, para a ficha abrir nela
+  const hrefDoVereador = (id: string) =>
+    hrefVereador(slug, id, leg.numero === legs[0].numero ? null : leg.numero, votacoes);
   const unanimes = leg.n_votacoes > 0 ? 1 - leg.n_divergentes / leg.n_votacoes : null;
   const grupos = new Set(comPosicao.map((p) => p.grupo)).size;
 
@@ -112,7 +115,7 @@ async function Camara({ params, searchParams }: PageProps<"/camaras/[municipio]"
         </div>
         {publicada && comPosicao.length > 0 ? (
           <>
-            <ReguaCamara posicoes={comPosicao} hrefVereador={hrefVereador} />
+            <ReguaCamara posicoes={comPosicao} hrefVereador={hrefDoVereador} />
             <p className="pequeno discreto leitura" style={{ marginTop: 16 }}>
               Cada bloco reúne vereadores que votam de forma indistinguível com as votações
               disponíveis: a ordem entre eles pode mudar com poucos votos. A régua é calibrada pelos
@@ -133,7 +136,7 @@ async function Camara({ params, searchParams }: PageProps<"/camaras/[municipio]"
         <div className="secao-cab">
           <h2>Todos os vereadores</h2>
         </div>
-        <Tabela linhas={linhas} hrefVereador={hrefVereador} publicada={publicada} />
+        <Tabela linhas={linhas} hrefVereador={hrefDoVereador} publicada={publicada} />
       </section>
     </>
   );

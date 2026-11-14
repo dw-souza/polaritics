@@ -38,6 +38,10 @@ ENDPOINTS = {
     "registrovotacao": "sessao/registrovotacao",
     "votoparlamentar": "sessao/votoparlamentar",
 }
+# Numa câmara que migrou para o Siscam, o SAPL só vale até a sua última votação, e estes
+# arquivos não mudam mais: já baixados, não são baixados de novo (salvo com `forcar`). O
+# cadastro, pequeno, é sempre atualizado.
+CONGELADOS_COM_SISCAM = ("materia", "sessao", "presenca", "registrovotacao", "votoparlamentar")
 # Campos de auditoria interna do SAPL (IP e usuário de quem registrou): não interessam e não
 # devem ser guardados.
 CAMPOS_DESCARTADOS = {"ip", "user", "biografia"}
@@ -45,6 +49,18 @@ POR_PAGINA = 100
 CONEXOES = 4
 TENTATIVAS = 4
 ESPERA_BASE_S = 2.0
+
+
+def endpoints_a_baixar(municipio: Municipio, forcar: bool = False) -> dict[str, str]:
+    """Endpoints do SAPL a baixar: todos, menos os congelados já baixados (câmara com Siscam)."""
+    return {
+        nome: endpoint
+        for nome, endpoint in ENDPOINTS.items()
+        if forcar
+        or not municipio.siscam
+        or nome not in CONGELADOS_COM_SISCAM
+        or not (municipio.dir_brutos / f"{nome}.json").exists()
+    }
 
 
 class ErroColetaSAPL(RuntimeError):

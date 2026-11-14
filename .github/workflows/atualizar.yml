@@ -70,7 +70,19 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --all-extras
 
-      - name: Coletar o SAPL das câmaras
+      # Votações antigas do SAPL de câmaras que migraram para o Siscam não mudam mais
+      # (CONGELADOS_COM_SISCAM em municipal/coleta.py): ficam em cache entre as execuções.
+      - name: Restaurar o SAPL congelado
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/raw/municipal/*/materia.json
+            data/raw/municipal/*/sessao.json
+            data/raw/municipal/*/presenca.json
+            data/raw/municipal/*/registrovotacao.json
+            data/raw/municipal/*/votoparlamentar.json
+          key: sapl-congelado-v1
+      - name: Coletar SAPL e Siscam das câmaras
         run: uv run polaritics municipal coletar
       - name: Calcular e validar
         run: uv run polaritics municipal calcular
