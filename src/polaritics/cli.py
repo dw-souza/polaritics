@@ -16,7 +16,7 @@ from polaritics.medidas.governismo import calcular_governismo
 from polaritics.medidas.ideologia import irt
 from polaritics.medidas.ideologia.calculo import VARIANTES, calcular_ideologia
 from polaritics.medidas.mandato import calcular_atividade, calcular_gastos, calcular_presenca
-from polaritics.municipal import pipeline
+from polaritics.municipal import eddydata, pipeline, tse
 from polaritics.municipal import publicar as publicar_municipal
 from polaritics.municipal.coleta import ENDPOINTS, ColetorSAPL, endpoints_a_baixar
 from polaritics.municipal.config import MUNICIPIOS
@@ -112,7 +112,13 @@ def municipal_coletar(args: argparse.Namespace) -> None:
         ColetorSAPL(m).coletar(endpoints)
         if m.siscam:
             contagem = ColetorSiscam(m.siscam, m.dir_brutos).coletar()
-            print(f"{slug}: Siscam com {contagem['votacoes']} votações nominais")
+            votacoes, projetos = contagem["votacoes"], contagem["projetos"]
+            print(f"{slug}: Siscam com {votacoes} votações e {projetos} projetos")
+        if m.eddydata_orgao:
+            contagem = eddydata.coletar(m.eddydata_orgao, m.dir_brutos)
+            print(f"{slug}: EddyData com {contagem['empenhos']} empenhos de viagem")
+        # eleições fechadas não mudam: só baixa o que falta (ou tudo, com --forcar)
+        tse.coletar(m.nome.upper(), m.uf, m.dir_brutos, forcar=args.forcar)
 
 
 def municipal_calcular(args: argparse.Namespace) -> None:

@@ -140,3 +140,97 @@ create table if not exists municipal.validacao (
     versao_metodologia  text not null,
     gerado_em           timestamp not null
 );
+
+-- Projetos apresentados como primeiro autor e aprovados em plenário (M9).
+create table if not exists municipal.atividade (
+    municipio               text not null,
+    legislatura             integer not null,
+    id_vereador             text not null,
+    apresentados            integer not null,
+    aprovados               integer not null,
+    aprovados_denominacao   integer not null,      -- só dão nome a vias e próprios públicos
+    primary key (municipio, legislatura, id_vereador)
+);
+
+create table if not exists municipal.projeto_aprovado (
+    municipio       text not null,
+    legislatura     integer not null,
+    id_vereador     text not null,
+    titulo          text not null,
+    ementa          text,
+    data            date,
+    denominacao     boolean not null,
+    url             text
+);
+
+-- Viagens oficiais (M10): custo líquido do processo de viagem (PIV), dividido entre os
+-- vereadores que viajaram.
+create table if not exists municipal.viagens (
+    municipio           text not null,
+    legislatura         integer not null,
+    id_vereador         text not null,
+    viagens             integer not null,
+    custo_atribuido     double precision not null,
+    custo_das_viagens   double precision not null,
+    primary key (municipio, legislatura, id_vereador)
+);
+
+create table if not exists municipal.viagem (
+    municipio       text not null,
+    legislatura     integer not null,
+    numero          integer not null,
+    ano             integer not null,
+    data            date,
+    ementa          text,
+    custo           double precision not null,
+    n_vereadores    integer not null,
+    url             text,
+    primary key (municipio, numero, ano)
+);
+
+create table if not exists municipal.viagem_vereador (
+    municipio       text not null,
+    numero          integer not null,
+    ano             integer not null,
+    id_vereador     text not null
+);
+
+-- Gasto de viagens da câmara por ano: total, com vereador identificado e sem processo (PIV).
+create table if not exists municipal.viagem_ano (
+    municipio       text not null,
+    ano             integer not null,
+    total           double precision not null,
+    com_vereador    double precision not null,
+    sem_piv         double precision not null,
+    primary key (municipio, ano)
+);
+
+-- Folha (M11): subsídio dos vereadores e número e custo dos assessores parlamentares.
+create table if not exists municipal.folha_mes (
+    municipio           text not null,
+    ano                 integer not null,
+    mes                 integer not null,
+    vereadores          integer not null,
+    subsidio            double precision,
+    assessores          integer not null,
+    custo_assessores    double precision,
+    primary key (municipio, ano, mes)
+);
+
+-- Campanha (M12): prestação de contas ao TSE na eleição que levou ao mandato.
+create table if not exists municipal.campanha (
+    municipio           text not null,
+    legislatura         integer not null,
+    id_vereador         text not null,
+    ano_eleicao         integer not null,
+    partido             text,
+    situacao            text,
+    receita             double precision not null,
+    fundo_especial      double precision not null,
+    fundo_partidario    double precision not null,
+    proprios            double precision not null,
+    pessoas_fisicas     double precision not null,
+    outros              double precision not null,
+    despesa             double precision not null,
+    primary key (municipio, legislatura, id_vereador)
+);

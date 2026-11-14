@@ -293,6 +293,66 @@ def atualidade(con, municipio, legislatura) -> Resultado:
     )
 
 
+def reais(valor: float) -> str:
+    return "R$ " + f"{valor:,.0f}".replace(",", ".")
+
+
+def conferencia_projetos(con, municipio, legislatura) -> Resultado:
+    """Aprovação dos projetos pelo Siscam × pelas votações do SAPL, onde os dois existem."""
+    linhas = con.execute(
+        """with sapl as (
+               select mt.sigla_tipo, mt.numero, mt.ano, bool_or(v.aprovada) as aprovado
+               from votacao v join materia mt using (municipio, id_materia)
+               where v.municipio = ? and v.legislatura = ? and v.aprovada is not null
+                 and mt.sigla_tipo in ('PLO', 'PLC', 'PELOM', 'PDL', 'PR')
+                 and v.id_votacao not like 'siscam-%'
+               group by all
+           )
+           select count(*), count(*) filter (s.aprovado = p.aprovado)
+           from sapl s join projeto p on p.municipio = ? and p.numero = s.numero
+                and p.ano = s.ano and p.sigla_tipo = s.sigla_tipo""",
+        [municipio, legislatura, municipio],
+    ).fetchone()
+    total, iguais = linhas
+    return Resultado(
+        "Aprovação de projetos: Siscam × votações do SAPL (indicador)",
+        None,
+        iguais / total if total else None,
+        "acompanhado",
+        "informativo",
+        f"{iguais} de {total} projetos votados no SAPL com o mesmo resultado (M9).",
+        obrigatorio=False,
+    )
+
+
+def cobertura_viagens(con, municipio, legislatura) -> Resultado:
+    custo, atribuido, sem_piv = con.execute(
+        """select sum(custo), sum(custo) filter (n_vereadores > 0),
+                  (select coalesce(sum(d.valor), 0) from despesa_viagem d
+                   join legislatura l on l.municipio = d.municipio and l.numero = ?
+                    and d.data between l.inicio and l.fim
+                   where d.municipio = ? and d.piv_numero is null)
+           from viagem_custo where municipio = ? and legislatura = ?""",
+        [legislatura, municipio, municipio, legislatura],
+    ).fetchone()
+    if not custo:
+        return Resultado(
+            "Viagens atribuídas a vereadores (indicador)", None, None, "acompanhado",
+            "informativo", "Sem dados de viagem.", obrigatorio=False,
+        )  # fmt: skip
+    return Resultado(
+        "Viagens atribuídas a vereadores (indicador)",
+        None,
+        atribuido / custo,
+        "acompanhado",
+        "informativo",
+        f"{reais(atribuido)} de {reais(custo)} em viagens com processo (PIV) têm ao menos um "
+        f"vereador identificado; o resto são viagens só de servidores ou sem os nomes. Fora "
+        f"disso, {reais(sem_piv)} em empenhos sem PIV (pedágios da frota, por exemplo) (M10).",
+        obrigatorio=False,
+    )
+
+
 def avaliar(con, municipio: str, legislatura: int, replicas: int = 100):
     sensibilidade, mudam = sensibilidade_variantes(con, municipio, legislatura)
     resultados = [
@@ -300,6 +360,8 @@ def avaliar(con, municipio: str, legislatura: int, replicas: int = 100):
         peso_mocoes(con, municipio, legislatura),
         conferencia_placar(con, municipio),
         atualidade(con, municipio, legislatura),
+        conferencia_projetos(con, municipio, legislatura),
+        cobertura_viagens(con, municipio, legislatura),
     ]
     for variante in VARIANTES_PUBLICADAS:
         resultados += [
@@ -316,7 +378,7 @@ def avaliar(con, municipio: str, legislatura: int, replicas: int = 100):
 def _valor(r: Resultado) -> str:
     if r.valor is None:
         return "—"
-    if r.criterio.startswith("Estabilidade"):
+    if r.criterio.startswith(("Estabilidade", "Aprovação de projetos", "Viagens atribuídas")):
         return f"{r.valor:.1%}"
     return f"{r.valor:.3f}" if r.valor % 1 else f"{r.valor:.0f}"
 

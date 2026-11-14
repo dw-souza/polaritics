@@ -17,7 +17,13 @@ from polaritics.municipal.ideologia import (
     VARIANTES_PUBLICADAS,
     calcular_ideologia,
 )
-from polaritics.municipal.medidas import calcular_governismo, calcular_presenca
+from polaritics.municipal.medidas import (
+    calcular_atividade,
+    calcular_folha,
+    calcular_governismo,
+    calcular_presenca,
+    calcular_viagens,
+)
 from polaritics.municipal.validacao import ESQUEMA_VALIDACAO, gerar
 
 log = logging.getLogger(__name__)
@@ -48,6 +54,9 @@ def calcular(
         con.execute(ESQUEMA_VALIDACAO)
         calcular_governismo(con)
         calcular_presenca(con)
+        calcular_atividade(con)
+        calcular_viagens(con)
+        calcular_folha(con)
         for m in municipios:
             for legislatura in legislaturas_com_votos(con, m.slug):
                 for variante in VARIANTES_PUBLICADAS:

@@ -31,6 +31,14 @@ TABELAS = [
     "presenca",
     "votacao_explicativa",
     "validacao",
+    "atividade",
+    "projeto_aprovado",
+    "viagens",
+    "viagem",
+    "viagem_vereador",
+    "viagem_ano",
+    "folha_mes",
+    "campanha",
 ]
 
 
@@ -130,6 +138,7 @@ def _carregar(con, m: Municipio, aprovadas: dict[int, list[str]]) -> None:
            from validacao where municipio = ?""",
         p,
     )
+    _carregar_mandato(con, m)
     for legislatura, variantes in aprovadas.items():
         con.execute(
             """insert into pg.municipal.publicacao
@@ -145,6 +154,80 @@ def _carregar(con, m: Municipio, aprovadas: dict[int, list[str]]) -> None:
                 legislatura,
             ],
         )
+
+
+def _carregar_mandato(con, m: Municipio) -> None:
+    """Atividade, viagens, folha e campanha (metodologia municipal, M9 a M12). Medidas
+    descritivas: não dependem do modelo nem da validação da posição."""
+    p = [m.slug]
+    con.execute(
+        """insert into pg.municipal.atividade
+           select a.municipio, a.legislatura, a.id_vereador, a.apresentados, a.aprovados,
+                  a.aprovados_denominacao
+           from atividade a
+           join mandato mt on mt.municipio = a.municipio and mt.id_vereador = a.id_vereador
+                and mt.legislatura = a.legislatura
+           where a.municipio = ?""",
+        p,
+    )
+    con.execute(
+        """insert into pg.municipal.projeto_aprovado
+           select p.municipio, l.numero, p.id_vereador, p.titulo, p.ementa, p.data,
+                  p.denominacao, p.url
+           from projeto p
+           join legislatura l on l.municipio = p.municipio and p.data between l.inicio and l.fim
+           where p.municipio = ? and p.aprovado and p.id_vereador is not null""",
+        p,
+    )
+    con.execute(
+        """insert into pg.municipal.viagens
+           select municipio, legislatura, id_vereador, viagens, custo_atribuido,
+                  custo_das_viagens
+           from viagens where municipio = ?""",
+        p,
+    )
+    con.execute(
+        """insert into pg.municipal.viagem
+           select municipio, legislatura, numero, ano, data, ementa, custo, n_vereadores, url
+           from viagem_custo where municipio = ? and legislatura is not null""",
+        p,
+    )
+    con.execute(
+        """insert into pg.municipal.viagem_vereador
+           select * from viagem_vereador where municipio = ?""",
+        p,
+    )
+    con.execute(
+        """insert into pg.municipal.viagem_ano
+           select d.municipio, year(d.data), sum(d.valor),
+                  coalesce(sum(d.valor) filter (c.n_vereadores > 0), 0),
+                  coalesce(sum(d.valor) filter (d.piv_numero is null), 0)
+           from despesa_viagem d
+           left join viagem_custo c on c.municipio = d.municipio and c.numero = d.piv_numero
+                and c.ano = d.piv_ano
+           where d.municipio = ?
+           group by all""",
+        p,
+    )
+    con.execute(
+        """insert into pg.municipal.folha_mes
+           select municipio, ano, mes, vereadores, subsidio, assessores, custo_assessores
+           from folha_mes where municipio = ?""",
+        p,
+    )
+    # campanha da eleição anterior ao início da legislatura, só para quem teve mandato nela
+    con.execute(
+        """insert into pg.municipal.campanha
+           select c.municipio, l.numero, c.id_vereador, c.ano_eleicao, c.partido, c.situacao,
+                  c.receita, c.fundo_especial, c.fundo_partidario, c.proprios,
+                  c.pessoas_fisicas, c.outros, c.despesa
+           from campanha c
+           join legislatura l on l.municipio = c.municipio and year(l.inicio) = c.ano_eleicao + 1
+           where c.municipio = ? and exists (
+               select 1 from mandato mt where mt.municipio = c.municipio
+               and mt.id_vereador = c.id_vereador and mt.legislatura = l.numero)""",
+        p,
+    )
 
 
 def _carregar_posicao(con, m: Municipio, legislatura: int, variantes: list[str]) -> None:

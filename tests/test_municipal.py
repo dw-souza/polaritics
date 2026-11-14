@@ -8,7 +8,7 @@ import pytest
 
 from polaritics.config import Periodo
 from polaritics.municipal import base as base_mun
-from polaritics.municipal import siscam
+from polaritics.municipal import eddydata, siscam, tse
 from polaritics.municipal.coleta import (
     CONGELADOS_COM_SISCAM,
     ENDPOINTS,
@@ -23,7 +23,7 @@ from polaritics.municipal.ideologia import (
     partido_na_legislatura,
     posicoes_na_camara,
 )
-from polaritics.municipal.medidas import calcular_governismo, calcular_presenca
+from polaritics.municipal.medidas import calcular_governismo, calcular_presenca, calcular_viagens
 
 MUNICIPIO = Municipio(
     "teste",
@@ -45,13 +45,14 @@ def _escrever(pasta, nome, registros):
     (pasta / f"{nome}.json").write_text(json.dumps(registros, ensure_ascii=False))
 
 
-def registro(id_, materia, data="2025-03-10", sim=2, nao=1):
+def registro(id_, materia, data="2025-03-10", sim=2, nao=1, resultado=2):
     return {
         "id": id_,
         "materia": materia,
         "data_hora": f"{data}T14:00:00-03:00",
         "numero_votos_sim": sim,
         "numero_votos_nao": nao,
+        "tipo_resultado_votacao": resultado,
     }
 
 
@@ -104,6 +105,10 @@ def brutos(tmp_path):
         registro(101, 11, sim=3, nao=0),
         registro(102, 12, data="2025-05-10"),
         registro(103, 13, sim=1, nao=2),  # placar diferente dos votos (2 × 1)
+    ])  # fmt: skip
+    _escrever(pasta, "tiporesultado", [
+        {"id": 2, "nome": "Aprovada por maioria simples", "natureza": "A"},
+        {"id": 5, "nome": "Rejeitada", "natureza": "R"},
     ])  # fmt: skip
     _escrever(pasta, "votoparlamentar", [
         voto(1, 100, 1, "Não"), voto(2, 100, 2, "Sim"), voto(3, 100, 3, "Sim"),
@@ -450,3 +455,155 @@ def test_sapl_congelado_nao_e_baixado_de_novo(tmp_path, monkeypatch):
     sem_siscam = Municipio("teste", "Teste", "SP", "x", MUNICIPIO.prefeitos)
     assert endpoints_a_baixar(sem_siscam) == ENDPOINTS
     assert set(CONGELADOS_COM_SISCAM) <= ENDPOINTS.keys()
+
+
+# --- Atividade, viagens, campanha e EddyData ---------------------------------------------------
+
+
+def test_chave_materia_liga_documento_e_votacao():
+    assert base_mun.chave_materia("PLO - Projeto de Lei Ordinária Nº 167/2026") == (
+        "PLO",
+        167,
+        2026,
+    )
+    assert base_mun.chave_materia("Projeto de Lei Nº 167/2026") == ("PLO", 167, 2026)
+    assert base_mun.chave_materia("Parecer ao Projeto Nº 7/2026")[0] == "Par"
+
+
+VEREADORES = {
+    "1": ("Daniel Bassi", "Daniel Henrique Silva Bassi"),
+    "2": ("Donizete da Farmácia", "Antônio Donizete Mercúrio"),
+    "3": ("Gilson Pelizaro", "Gilson Donizete Pelizaro"),
+    "4": ("Carlinho Petrópolis Farmácia", "Carlos César Buci"),
+    "5": ("Ronaldo Carvalho", "Ronaldo Ronei de Carvalho"),
+}
+
+
+def test_apelidos_so_valem_quando_apontam_um_unico_vereador():
+    a = base_mun.apelidos(VEREADORES)
+    assert a["bassi"] == "1" and a["donizete"] == "2" and a["pelizaro"] == "3"
+    assert "farmacia" not in a  # Donizete da Farmácia e Carlinho Petrópolis Farmácia
+
+
+def test_participantes_da_viagem_pelos_tres_sinais():
+    p = base_mun.participantes
+    assert p("Gilson Donizete Pelizaro (Gilson Pelizaro), Fulano", "", [], VEREADORES) == {"3"}
+    # apelidos na ementa, antes da lista de acompanhantes (o assessor Ronaldo não conta)
+    ementa = "Viagem a SP - Bassi, Donizete - Assessor Ronaldo Honório"
+    assert p("Antônio", ementa, [], VEREADORES) == {"1", "2"}
+    historico = "PIV 17/2025 - VIAGEM À ITABORAI. VER. CARLOS CESAR BUCI - CONHECER O PROJETO"
+    assert p(None, "Viagem a Itaboraí", [historico], VEREADORES) == {"4"}
+
+
+def test_viagens_custo_liquido_e_divisao_entre_vereadores(brutos):
+    raiz, especialistas = brutos
+    pasta = raiz / "raw" / "teste"
+    _escrever(pasta, "siscam_votacoes", [])
+    _escrever(pasta, "siscam_frequencias", [])
+    _escrever(pasta, "siscam_piv", [
+        {"id": 1, "titulo": "PIV - Procedimento Interno de Viagem Nº 5/2025", "data": "2025-06-01",
+         "ementa": "Viagem a SP - Ana e Bia - Assessor Cris", "autoria": "Ana"},
+    ])  # fmt: skip
+    _escrever(pasta, "eddydata_viagens", [
+        {"id": 10, "numero": 77, "data": "2025-06-01", "especie": "EMO", "valor": 1000.0,
+         "despesa": "33901400", "subelemento": "DIÁRIAS", "historico": "PIV 05/2025 - VIAGEM"},
+        {"id": 11, "numero": 77, "data": "2025-06-20", "especie": "EOA", "valor": -200.0,
+         "despesa": "33901400", "subelemento": "DIÁRIAS", "historico": "Saldo não utilizado"},
+        {"id": 12, "numero": 78, "data": "2025-06-01", "especie": "EMO", "valor": 50.0,
+         "despesa": "33903300", "subelemento": "PEDÁGIOS", "historico": "SEM PARAR"},
+    ])  # fmt: skip
+    municipio = Municipio("teste", "Teste", "SP", "x", MUNICIPIO.prefeitos, siscam="y")
+    destino = raiz / "viagens.duckdb"
+    base_mun.construir_base([municipio], destino, especialistas, raiz_brutos=raiz / "raw")
+    with duckdb.connect(str(destino)) as con:
+        calcular_viagens(con)
+        assert con.execute("select custo, n_vereadores from viagem_custo").fetchall() == [
+            (800.0, 2)
+        ]
+        assert con.execute(
+            "select id_vereador, viagens, custo_atribuido from viagens order by 1"
+        ).fetchall() == [("1", 1, 400.0), ("2", 1, 400.0)]
+        # o pedágio sem PIV fica fora das viagens
+        assert con.execute(
+            "select count(*) from despesa_viagem where piv_numero is null"
+        ).fetchone() == (1,)
+
+
+def test_projeto_aprovado_pelas_votacoes_do_siscam(brutos):
+    raiz, especialistas = brutos
+    pasta = raiz / "raw" / "teste"
+    _escrever(pasta, "siscam_frequencias", [])
+    _escrever(pasta, "siscam_votacoes", [
+        {"id": 1, "titulo": "Projeto de Lei Nº 3/2025", "id_sessao": None, "sessao": None,
+         "data": "2025-02-01", "data_documento": None, "ementa": None, "tipo": "Simbólica",
+         "autoria": None, "resultado": "Aprovada por unanimidade", "grupos": {}},
+    ])  # fmt: skip
+    _escrever(pasta, "siscam_projetos", [
+        {"id": 9, "titulo": "PLO - Projeto de Lei Ordinária Nº 3/2025", "data": "2025-01-20",
+         "situacao": None, "ementa": "Denomina a Rua X", "observacoes": None,
+         "autoria": "Ana Civil (Ana), Bia Civil (Bia)"},
+        {"id": 10, "titulo": "PLO - Projeto de Lei Ordinária Nº 4/2025", "data": "2025-01-21",
+         "situacao": None, "ementa": "Institui algo", "observacoes": None,
+         "autoria": "Prefeita"},
+    ])  # fmt: skip
+    municipio = Municipio("teste", "Teste", "SP", "x", MUNICIPIO.prefeitos, siscam="y")
+    destino = raiz / "projetos.duckdb"
+    base_mun.construir_base([municipio], destino, especialistas, raiz_brutos=raiz / "raw")
+    with duckdb.connect(str(destino)) as con:
+        assert con.execute(
+            """select id_projeto, id_vereador, do_executivo, denominacao, aprovado
+               from projeto order by 1"""
+        ).fetchall() == [("10", None, True, False, False), ("9", "1", False, True, True)]
+
+
+@pytest.mark.parametrize(
+    ("origem", "fonte", "categoria"),
+    [
+        ("Recursos de partido político", "FUNDO ESPECIAL", "fundo_especial"),
+        ("Recursos de partido político", "FUNDO PARTIDARIO", "fundo_partidario"),
+        ("Recursos próprios", "OUTROS RECURSOS", "proprios"),
+        ("Recursos de Financiamento Coletivo", "OUTROS RECURSOS", "pessoas_fisicas"),
+        ("Recursos de outros candidatos", "OUTROS RECURSOS", "outros"),
+    ],
+)
+def test_categoria_de_receita_de_campanha(origem, fonte, categoria):
+    assert base_mun.categoria_receita(origem, fonte) == categoria
+
+
+def test_assinatura_do_token_publico_segue_o_javascript():
+    assert eddydata.js_to_fixed0(5, 0) == "Infinity"
+    assert eddydata.js_to_fixed0(0, 0) == "NaN"
+    assert eddydata.js_to_fixed0(5, 2) == "3"  # toFixed arredonda meio para cima
+
+
+def test_arquivo_remoto_le_por_faixas():
+    conteudo = bytes(range(256)) * 40
+
+    def servidor(request: httpx.Request) -> httpx.Response:
+        if request.method == "HEAD":
+            return httpx.Response(
+                200, headers={"accept-ranges": "bytes", "content-length": str(len(conteudo))}
+            )
+        inicio, fim = map(int, request.headers["range"].removeprefix("bytes=").split("-"))
+        return httpx.Response(206, content=conteudo[inicio : fim + 1])
+
+    arquivo = tse.ArquivoRemoto(
+        "https://x/a.zip", httpx.Client(transport=httpx.MockTransport(servidor))
+    )
+    arquivo.seek(-10, 2)
+    assert arquivo.read(10) == conteudo[-10:]
+    arquivo.seek(300)
+    assert arquivo.read(4) == conteudo[300:304]
+
+
+@pytest.mark.parametrize(
+    ("ementa", "denominacao"),
+    [
+        ("Denomina a Rua RSC 6 com o nome de Fulano", True),
+        ("Dá denominação ao Centro Esportivo do Jardim X", True),
+        ("Altera a denominação da creche situada na Rua Y", True),
+        ("Institui o Programa Municipal de Apoio ao Aleitamento", False),
+    ],
+)
+def test_denominacao_de_vias_e_proprios(ementa, denominacao):
+    assert bool(base_mun.DENOMINACAO.match(ementa)) is denominacao
