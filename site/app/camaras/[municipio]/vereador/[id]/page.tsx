@@ -19,6 +19,9 @@ import {
 import {
   URL_METODOLOGIA_MUNICIPAL,
   cargoVereador,
+  hrefCamara,
+  hrefVereador,
+  legislaturas,
   filiacoes,
   mandatosDoVereador,
   municipio,
@@ -54,22 +57,35 @@ const ano = (d: string) => d.slice(0, 4);
 
 async function Ficha({ params, searchParams }: Props) {
   const { municipio: slug, id } = await params;
-  const { votacoes } = lerVisao(await searchParams);
+  const busca = await searchParams;
+  const { votacoes } = lerVisao(busca);
   const [m, v] = await Promise.all([municipio(slug), vereador(slug, id)]);
   if (!m || !v) notFound();
-  const [mandatos, fil, notas] = await Promise.all([
+  const [mandatos, fil, notas, legs] = await Promise.all([
     mandatosDoVereador(slug, id),
     filiacoes(slug, id),
     notasDosPartidos(),
+    legislaturas(slug),
   ]);
   if (mandatos.length === 0) notFound();
   const atual = mandatos[0];
-  const base = `/camaras/${slug}/vereador/${id}`;
+  // legislatura em vista: a pedida no endereço, se ele votou nela; senão, a mais recente dele
+  const mandato = mandatos.find((x) => x.legislatura === Number(busca.legislatura)) ?? atual;
+  const naUrl = (x: MandatoVereador) => (x === atual ? null : x.legislatura);
+  const camaraMaisRecente = legs[0]?.numero;
 
   return (
     <article>
       <p className={estilos.migalha}>
-        <Link href={`/camaras/${slug}`}>← Câmara de {m.nome}</Link>
+        <Link
+          href={hrefCamara(
+            slug,
+            mandato.legislatura === camaraMaisRecente ? null : mandato.legislatura,
+            votacoes,
+          )}
+        >
+          ← Câmara de {m.nome}
+        </Link>
       </p>
       <header className={estilos.identidade}>
         <Foto url={v.foto_url} nome={v.nome} tamanho={104} />
@@ -82,11 +98,29 @@ async function Ficha({ params, searchParams }: Props) {
       </header>
 
       <div className="secao-cab" style={{ marginTop: 24 }}>
+        {mandatos.length > 1 ? (
+          <nav className="seg" aria-label="Legislatura">
+            {mandatos.map((x) => (
+              <Link
+                key={x.legislatura}
+                href={hrefVereador(slug, id, naUrl(x), votacoes)}
+                aria-current={x === mandato ? "true" : undefined}
+                scroll={false}
+              >
+                {x.legislatura}ª · {ano(x.inicio)}–{ano(x.fim)}
+              </Link>
+            ))}
+          </nav>
+        ) : (
+          <span className="pequeno discreto">
+            Vereador{v.sexo === "F" ? "a" : ""} só na {mandato.legislatura}ª legislatura
+          </span>
+        )}
         <nav className="seg" aria-label="Votações consideradas">
           {(Object.keys(VOTACOES) as Votacoes[]).map((x) => (
             <Link
               key={x}
-              href={x === "todas" ? base : `${base}?votacoes=${x}`}
+              href={hrefVereador(slug, id, naUrl(mandato), x)}
               aria-current={x === votacoes ? "true" : undefined}
               scroll={false}
             >
@@ -94,23 +128,21 @@ async function Ficha({ params, searchParams }: Props) {
             </Link>
           ))}
         </nav>
-        {mandatos.length > 1 && (
-          <span className="pequeno discreto">
-            {mandatos.length} legislaturas · a régua é recalibrada em cada uma
-          </span>
-        )}
       </div>
+      {mandatos.length > 1 && (
+        <p className="pequeno discreto">
+          Votou em {mandatos.length} legislaturas. A régua é recalibrada em cada uma: para
+          comparar, use a posição na câmara.
+        </p>
+      )}
 
-      {mandatos.map((mandato) => (
-        <Legislatura
-          key={mandato.legislatura}
-          municipio={m}
-          vereador={v}
-          mandato={mandato}
-          votacoes={votacoes}
-          notas={notas}
-        />
-      ))}
+      <Legislatura
+        municipio={m}
+        vereador={v}
+        mandato={mandato}
+        votacoes={votacoes}
+        notas={notas}
+      />
 
       {fil.length > 0 && (
         <section className="secao">
@@ -288,7 +320,9 @@ async function Legislatura({
             <div style={{ marginTop: 16 }}>
               <ReguaCamara
                 posicoes={camara}
-                hrefVereador={(id) => `/camaras/${m.municipio}/vereador/${id}`}
+                hrefVereador={(id) =>
+                  hrefVereador(m.municipio, id, mandato.legislatura, votacoes)
+                }
                 destaque={v.id_vereador}
               />
             </div>

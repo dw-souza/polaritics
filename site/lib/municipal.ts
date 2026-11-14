@@ -281,3 +281,17 @@ export function hrefCamara(slug: string, legislatura: number | null, votacoes: V
   const s = q.toString();
   return s ? `/camaras/${slug}?${s}` : `/camaras/${slug}`;
 }
+
+// Ficha do vereador; sem legislatura, abre na mais recente em que ele votou.
+export function hrefVereador(
+  slug: string,
+  id: string,
+  legislatura: number | null,
+  votacoes: Votacoes,
+) {
+  const q = new URLSearchParams();
+  if (legislatura !== null) q.set("legislatura", String(legislatura));
+  if (votacoes !== "todas") q.set("votacoes", votacoes);
+  const s = q.toString();
+  return s ? `/camaras/${slug}/vereador/${id}?${s}` : `/camaras/${slug}/vereador/${id}`;
+}
